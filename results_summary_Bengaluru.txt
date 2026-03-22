@@ -1,4 +1,4 @@
-TRAFFIC SIMULATION REPORT: Paris, France
+TRAFFIC SIMULATION REPORT: Bengaluru, India
 ============================================================
 
 LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
@@ -6,9 +6,9 @@ LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
 
 WAITING TIME COMPARISON:
                  Controller  Avg Queue  Avg Travel Time  Avg Wait Time  Max Wait Time  Total Wait  Throughput
-PROPOSED (Live-Dynamic WTM)     740.90            47.65          47.65           84.0     16677.0         350
-               BACKPRESSURE     714.46            48.37          48.37           89.0     22204.0         459
-                      FIXED     792.90            54.00          54.00           86.0      8586.0         159
+PROPOSED (Live-Dynamic WTM)     823.37            37.39          37.39           89.0       860.0          23
+               BACKPRESSURE     821.78            48.26          48.26           83.0      1689.0          35
+                      FIXED     829.44            74.20          74.20           75.0       371.0           5
 ============================================================
 
 NOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic

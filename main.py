@@ -16,13 +16,13 @@ import osmnx as ox
 import pandas as pd
 
 # --- CONFIGURATION ---
-PLACE = "Paris, France"
+PLACE = "Bengaluru, India"
 NETWORK_TYPE = "drive"
 RANDOM_SEED = 42
 SIMULATION_STEPS = 90
-CYCLE_TIME = 60
+CYCLE_TIME = 120
 MIN_GREEN = 15
-MAX_GREEN = 45
+MAX_GREEN = 60
 ARRIVAL_RATE = 18
 NUM_OD_PAIRS = 40
 NUM_TRIALS = 20
