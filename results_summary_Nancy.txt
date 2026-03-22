@@ -1,9 +1,19 @@
 TRAFFIC SIMULATION REPORT: Nancy, France
 ============================================================
 
-WAITING TIME COMPARISON:
-    Controller  Avg Queue  Avg Travel Time  Avg Wait Time  Max Wait Time  Total Wait  Throughput
-PROPOSED (WTM)     492.77            31.96          31.96           65.0     31479.0         985
-  BACKPRESSURE     516.76            32.43          32.43           79.0     29444.0         908
-         FIXED     661.86            41.37          41.37           89.0     22712.0         549
+LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
 ============================================================
+
+WAITING TIME COMPARISON:
+                 Controller  Avg Queue  Avg Travel Time  Avg Wait Time  Max Wait Time  Total Wait  Throughput
+               BACKPRESSURE     516.76            32.43          32.43           79.0     29444.0         908
+PROPOSED (Live-Dynamic WTM)     540.48            34.78          34.78           80.0     31095.0         894
+                      FIXED     661.86            41.37          41.37           89.0     22712.0         549
+============================================================
+
+NOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic
+green light timing allocation, where each intersection adjusts its
+green duration in real-time based on:
+  - Alpha (α): Current queue pressure relative to capacity
+  - Beta (β): Cumulative waiting time of vehicles
+  - Gamma (γ): Structural importance (Betweenness Centrality)

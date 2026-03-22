@@ -1,4 +1,4 @@
-TRAFFIC SIMULATION REPORT: Moscow, Russia
+TRAFFIC SIMULATION REPORT: Zaragoza, Spain
 ============================================================
 
 LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
@@ -6,9 +6,9 @@ LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
 
 WAITING TIME COMPARISON:
                  Controller  Avg Queue  Avg Travel Time  Avg Wait Time  Max Wait Time  Total Wait  Throughput
-PROPOSED (Live-Dynamic WTM)     762.42            51.19          51.19           84.0     15408.0         301
-               BACKPRESSURE     756.76            51.76          51.76           88.0     17030.0         329
-                      FIXED     801.40            52.73          52.73           86.0      6960.0         132
+               BACKPRESSURE     695.74            43.87          43.87           83.0     21542.0         491
+PROPOSED (Live-Dynamic WTM)     710.82            46.02          46.02           88.0     20570.0         447
+                      FIXED     772.60            52.90          52.90           86.0     13436.0         254
 ============================================================
 
 NOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic

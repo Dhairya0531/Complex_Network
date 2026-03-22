@@ -16,7 +16,7 @@ import osmnx as ox
 import pandas as pd
 
 # --- CONFIGURATION ---
-PLACE = "Moscow, Russia"
+PLACE = "Paris, France"
 NETWORK_TYPE = "drive"
 RANDOM_SEED = 42
 SIMULATION_STEPS = 90
@@ -245,6 +245,7 @@ def prepare_topology(graph):
         "alpha_dynamic": alpha_dynamic,
         "beta_dynamic": beta_dynamic,
         "gamma_dynamic": gamma_dynamic,
+        "edge_caps": edge_caps,
     }
 
 
@@ -264,6 +265,7 @@ def choose_edge_for_node_wtm(
     a = topology_data["alpha_dynamic"][target_node_idx]
     b = topology_data["beta_dynamic"][target_node_idx]
     g = topology_data["gamma_dynamic"][target_node_idx]
+    edge_caps = topology_data["edge_caps"]
 
     cumulative_wait = np.zeros(len(incoming))
     for i, edge_idx in enumerate(incoming):
@@ -272,10 +274,15 @@ def choose_edge_for_node_wtm(
             wait_times = [step - arrival_step for _, arrival_step, _ in queue]
             cumulative_wait[i] = np.sum(wait_times)
 
+    # Normalize metrics for selection consistent with timing logic
+    queue_pressure = queue_counts[incoming] / np.maximum(1.0, edge_caps[incoming])
+    wait_pressure = cumulative_wait / np.maximum(1.0, edge_caps[incoming] * CYCLE_TIME)
     source_importance = node_importance[edge_source_idx[incoming]]
-    scores = a * queue_counts[incoming] + b * cumulative_wait + g * source_importance
-    selected_idx = incoming[np.argmax(scores)]
-    return selected_idx
+
+    scores = a * queue_pressure + b * wait_pressure + g * source_importance
+    best_local_idx = np.argmax(scores)
+    selected_idx = incoming[best_local_idx]
+    return selected_idx, cumulative_wait[best_local_idx]
 
 
 def run_simulation_with_waiting_time(
@@ -297,6 +304,10 @@ def run_simulation_with_waiting_time(
     num_edges = topology["num_edges"]
     nodes = topology["nodes"]
     node_importance = topology["node_importance"]
+    edge_caps = topology["edge_caps"]
+    alpha_dynamic = topology["alpha_dynamic"]
+    beta_dynamic = topology["beta_dynamic"]
+    gamma_dynamic = topology["gamma_dynamic"]
 
     indexed_routes = [[edge_to_idx[e] for e in r["edges"]] for r in route_bank]
     edge_queues = [deque() for _ in range(num_edges)]
@@ -328,7 +339,7 @@ def run_simulation_with_waiting_time(
                 elif controller == "backpressure":
                     selected_idx = incoming[np.argmax(queue_counts[incoming])]
                 elif controller == "dynamic_wtm":
-                    selected_idx = choose_edge_for_node_wtm(
+                    selected_idx, wait_time_sum = choose_edge_for_node_wtm(
                         incoming,
                         queue_counts,
                         edge_queues,
@@ -339,7 +350,46 @@ def run_simulation_with_waiting_time(
                         topology,
                     )
 
-                move_count = min(queue_counts[selected_idx], move_caps[selected_idx])
+                # --- LIVE-DYNAMIC TIMING ALLOCATION ---
+                if controller == "dynamic_wtm":
+                    # Extract dynamic parameters for this node
+                    a = alpha_dynamic[v_idx]
+                    b = beta_dynamic[v_idx]
+                    g = gamma_dynamic[v_idx]
+                    edge_cap = edge_caps[selected_idx]
+
+                    # Calculate Queue Pressure (Alpha term)
+                    queue_pressure = queue_counts[selected_idx] / max(1.0, edge_cap)
+
+                    # Calculate Wait Pressure (Beta term)
+                    wait_pressure = wait_time_sum / max(1.0, edge_cap * CYCLE_TIME)
+
+                    # Calculate Structural Importance (Gamma term)
+                    source_node_idx = edge_source_idx[selected_idx]
+                    importance_bonus = node_importance[source_node_idx]
+
+                    # Fuse metrics into Situational Priority Score
+                    situational_priority = np.clip(
+                        a * queue_pressure + b * wait_pressure + g * importance_bonus,
+                        0.0,
+                        1.0,
+                    )
+
+                    # Scale green time between MIN_GREEN and MAX_GREEN
+                    dynamic_green = (
+                        MIN_GREEN + (MAX_GREEN - MIN_GREEN) * situational_priority
+                    )
+
+                    # Convert green duration to vehicle capacity for this step
+                    current_move_cap = max(
+                        1, int(np.floor(edge_cap * (dynamic_green / CYCLE_TIME)))
+                    )
+                    move_count = min(queue_counts[selected_idx], current_move_cap)
+                else:
+                    move_count = min(
+                        queue_counts[selected_idx], move_caps[selected_idx]
+                    )
+
                 if move_count > 0:
                     q = edge_queues[selected_idx]
                     for _ in range(move_count):
@@ -401,7 +451,7 @@ def run_simulation_with_waiting_time(
 # --- EVALUATION ---
 
 print("=" * 80)
-print("SIGNAL SCHEDULING COMPARISON: Dynamic Network Awareness")
+print("SIGNAL SCHEDULING COMPARISON: Live-Dynamic Network Awareness")
 print("=" * 80)
 
 topology = prepare_topology(G)
@@ -422,7 +472,7 @@ wtm_comparison_df = (
     pd.DataFrame(
         [
             {
-                "Controller": "PROPOSED (WTM)"
+                "Controller": "PROPOSED (Live-Dynamic WTM)"
                 if r["controller"] == "dynamic_wtm"
                 else r["controller"].upper(),
                 "Avg Queue": round(r["avg_queue_length"], 2),
@@ -440,7 +490,7 @@ wtm_comparison_df = (
 )
 
 print("\n" + "=" * 100)
-print("WAITING TIME COMPARISON: Fixed vs Backpressure vs Proposed (WTM)")
+print("WAITING TIME COMPARISON: Fixed vs Backpressure vs Proposed (Live-Dynamic WTM)")
 print("=" * 100)
 print(wtm_comparison_df.to_string(index=False))
 print("=" * 100)
@@ -455,7 +505,7 @@ controllers_list = ["fixed", "backpressure", "dynamic_wtm"]
 controller_labels = {
     "fixed": "Fixed (Baseline)",
     "backpressure": "Backpressure",
-    "dynamic_wtm": "Proposed (WTM)",
+    "dynamic_wtm": "Proposed (Live-Dynamic WTM)",
 }
 controller_colors = {
     "fixed": "#95a5a6",
@@ -646,7 +696,7 @@ cmap_rg = cm.viridis
 fig5, (ax5a, ax5b) = plt.subplots(1, 2, figsize=(16, 7))
 for ax_h, ctrl, title in [
     (ax5a, "fixed", "Fixed (Baseline)"),
-    (ax5b, "dynamic_wtm", "Proposed (WTM)"),
+    (ax5b, "dynamic_wtm", "Proposed (Live-Dynamic WTM)"),
 ]:
     xs, ys, cs = [], [], []
     for node, coords in node_coords.items():
@@ -684,7 +734,7 @@ _make_folium_map(avg_node_q["fixed"], "Fixed", map_center, vmin_q, vmax_q).save(
     "plot5_heatmap_fixed.html"
 )
 _make_folium_map(
-    avg_node_q["dynamic_wtm"], "Proposed (WTM)", map_center, vmin_q, vmax_q
+    avg_node_q["dynamic_wtm"], "Proposed (Live-Dynamic WTM)", map_center, vmin_q, vmax_q
 ).save("plot5_heatmap_wtm.html")
 
 # Plot 6
@@ -746,8 +796,16 @@ report_filename = f"results_summary_{PLACE.split(',')[0].replace(' ', '_')}.txt"
 with open(report_filename, "w") as f:
     f.write(f"TRAFFIC SIMULATION REPORT: {PLACE}\n")
     f.write("=" * 60 + "\n\n")
+    f.write("LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION\n")
+    f.write("=" * 60 + "\n\n")
     f.write("WAITING TIME COMPARISON:\n")
     f.write(wtm_comparison_df.to_string(index=False))
     f.write("\n" + "=" * 60 + "\n")
+    f.write("\nNOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic\n")
+    f.write("green light timing allocation, where each intersection adjusts its\n")
+    f.write("green duration in real-time based on:\n")
+    f.write("  - Alpha (α): Current queue pressure relative to capacity\n")
+    f.write("  - Beta (β): Cumulative waiting time of vehicles\n")
+    f.write("  - Gamma (γ): Structural importance (Betweenness Centrality)\n")
 
 print(f"\nResults saved to: {report_filename}\n")
