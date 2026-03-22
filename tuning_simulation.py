@@ -16,13 +16,13 @@ import osmnx as ox
 import pandas as pd
 
 # --- CONFIGURATION ---
-PLACE = "Nancy, France"
+PLACE = "Bengaluru, India"
 NETWORK_TYPE = "drive"
 RANDOM_SEED = 42
 SIMULATION_STEPS = 90
-CYCLE_TIME = 60
+CYCLE_TIME = 120
 MIN_GREEN = 15
-MAX_GREEN = 45
+MAX_GREEN = 60
 ARRIVAL_RATE = 18
 NUM_OD_PAIRS = 40
 NUM_TRIALS = 20
@@ -181,7 +181,24 @@ print(f"Vehicles scheduled: {total_arrivals}")
 # --- TOPOLOGY PREPARATION ---
 
 
-def prepare_topology(graph):
+# Global tuning parameters
+TUNING_PARAMS = {
+    "alpha_off": 0.5,
+    "alpha_mul": 0.5,
+    "beta_mul": 0.5,
+    "gamma_off": 0.2,
+    "gamma_mul": 0.8,
+}
+
+def prepare_topology(graph, params=None):
+    if params is None:
+        params = TUNING_PARAMS
+    alpha_off = params.get("alpha_off", 0.5)
+    alpha_mul = params.get("alpha_mul", 0.5)
+    beta_mul = params.get("beta_mul", 0.5)
+    gamma_off = params.get("gamma_off", 0.2)
+    gamma_mul = params.get("gamma_mul", 0.8)
+
     nodes = list(graph.nodes())
     node_to_idx = {node: i for i, node in enumerate(nodes)}
     edges = list(graph.edges())
@@ -208,11 +225,11 @@ def prepare_topology(graph):
     )
 
     # DYNAMIC TOPOLOGY SCALING
-    alpha_dynamic = 0.5 + 0.5 * (
+    alpha_dynamic = alpha_off + alpha_mul * (
         node_in_counts / max(1.0, np.max(node_in_counts_fixed))
     )
-    beta_dynamic = 0.5 * (1.0 - node_importance)
-    gamma_dynamic = 0.2 + 0.8 * node_importance
+    beta_dynamic = beta_mul * (1.0 - node_importance)
+    gamma_dynamic = gamma_off + gamma_mul * node_importance
 
     move_cap_fixed = np.maximum(
         1, np.floor(edge_caps / node_in_counts_fixed[edge_target_idx])
@@ -279,9 +296,7 @@ def choose_edge_for_node_wtm(
     wait_pressure = cumulative_wait / np.maximum(1.0, edge_caps[incoming] * CYCLE_TIME)
     source_importance = node_importance[edge_source_idx[incoming]]
 
-    # MULTIPLICATIVE HUB AWARENESS: Hub status acts as a multiplier to traffic signals.
-    # This ensures "Empty Hubs" don't steal green time from busy side roads.
-    scores = (a * queue_pressure + b * wait_pressure) * (1.0 + g * source_importance)
+    scores = a * queue_pressure + b * wait_pressure + g * source_importance
     best_local_idx = np.argmax(scores)
     selected_idx = incoming[best_local_idx]
     return selected_idx, cumulative_wait[best_local_idx]
@@ -293,9 +308,10 @@ def run_simulation_with_waiting_time(
     demand_schedule,
     controller,
     topology=None,
+    params=None,
 ):
     if topology is None:
-        topology = prepare_topology(graph)
+        topology = prepare_topology(graph, params=params)
 
     node_to_idx = topology["node_to_idx"]
     edge_to_idx = topology["edge_to_idx"]
@@ -370,12 +386,9 @@ def run_simulation_with_waiting_time(
                     source_node_idx = edge_source_idx[selected_idx]
                     importance_bonus = node_importance[source_node_idx]
 
-                    # MULTIPLICATIVE SITUATIONAL PRIORITY:
-                    # Hub awareness amplifies existing traffic demand.
-                    # This prevents wasting green time on empty important roads.
+                    # Fuse metrics into Situational Priority Score
                     situational_priority = np.clip(
-                        (a * queue_pressure + b * wait_pressure)
-                        * (1.0 + g * importance_bonus),
+                        a * queue_pressure + b * wait_pressure + g * importance_bonus,
                         0.0,
                         1.0,
                     )
@@ -429,13 +442,13 @@ def run_simulation_with_waiting_time(
     return {
         "controller": controller,
         "avg_queue_length": float(np.mean(queue_history)) if queue_history else 0.0,
-        "avg_travel_time": float(np.mean(completed_travel_times)) * CYCLE_TIME
+        "avg_travel_time": float(np.mean(completed_travel_times))
         if completed_travel_times
         else np.nan,
-        "total_wait_time": float(np.sum(completed_wait_times)) * CYCLE_TIME
+        "total_wait_time": float(np.sum(completed_wait_times))
         if completed_wait_times
         else 0.0,
-        "avg_wait_time": float(np.mean(completed_wait_times)) * CYCLE_TIME
+        "avg_wait_time": float(np.mean(completed_wait_times))
         if completed_wait_times
         else np.nan,
         "throughput": len(completed_travel_times),
@@ -443,7 +456,7 @@ def run_simulation_with_waiting_time(
         if total_injected
         else 0.0,
         "queue_history": queue_history,
-        "max_wait_time": float(np.max(completed_wait_times)) * CYCLE_TIME
+        "max_wait_time": float(np.max(completed_wait_times))
         if completed_wait_times
         else 0.0,
         "avg_node_queue": {
@@ -453,52 +466,56 @@ def run_simulation_with_waiting_time(
     }
 
 
+topology = prepare_topology(G, params=TUNING_PARAMS)
+
 # --- EVALUATION ---
-
-print("=" * 80)
-print("SIGNAL SCHEDULING COMPARISON: Live-Dynamic Network Awareness")
-print("=" * 80)
-
-topology = prepare_topology(G)
-demand_schedule = build_demand_schedule(SIMULATION_STEPS, ARRIVAL_RATE, RANDOM_SEED)
-
-controllers_to_test = ["fixed", "backpressure", "dynamic_wtm"]
-wtm_results = []
-
-for controller in controllers_to_test:
-    print(f"Testing {controller.upper():15s} ...", end=" ", flush=True)
-    result = run_simulation_with_waiting_time(
-        G, route_bank, demand_schedule, controller, topology=topology
+if __name__ == "__main__":
+    print("=" * 80)
+    print("SIGNAL SCHEDULING COMPARISON: Live-Dynamic Network Awareness")
+    print("=" * 80)
+    
+    demand_schedule = build_demand_schedule(SIMULATION_STEPS, ARRIVAL_RATE, RANDOM_SEED)
+    
+    controllers_to_test = ["fixed", "backpressure", "dynamic_wtm"]
+    wtm_results = []
+    
+    for controller in controllers_to_test:
+        print(f"Testing {controller.upper():15s} ...", end=" ", flush=True)
+        result = run_simulation_with_waiting_time(
+            G, route_bank, demand_schedule, controller, topology=topology, params=TUNING_PARAMS
+        )
+        wtm_results.append(result)
+        print("Done")
+    
+    # ... rest of the evaluation code... 
+    wtm_comparison_df = (
+        pd.DataFrame(
+            [
+                {
+                    "Controller": "PROPOSED (Live-Dynamic WTM)"
+                    if r["controller"] == "dynamic_wtm"
+                    else r["controller"].upper(),
+                    "Avg Queue": round(r["avg_queue_length"], 2),
+                    "Avg Travel Time": round(r["avg_travel_time"], 2),
+                    "Avg Wait Time": round(r["avg_wait_time"], 2),
+                    "Max Wait Time": round(r["max_wait_time"], 2),
+                    "Total Wait": round(r["total_wait_time"], 0),
+                    "Throughput": round(r["throughput"], 0),
+                }
+                for r in wtm_results
+            ]
+        )
+        .sort_values("Avg Wait Time")
+        .reset_index(drop=True)
     )
-    wtm_results.append(result)
-    print("Done")
-
-wtm_comparison_df = (
-    pd.DataFrame(
-        [
-            {
-                "Controller": "PROPOSED (Live-Dynamic WTM)"
-                if r["controller"] == "dynamic_wtm"
-                else r["controller"].upper(),
-                "Avg Queue": round(r["avg_queue_length"], 2),
-                "Avg Travel Time (s)": round(r["avg_travel_time"], 2),
-                "Avg Wait Time (s)": round(r["avg_wait_time"], 2),
-                "Max Wait Time (s)": round(r["max_wait_time"], 2),
-                "Total Wait (s)": round(r["total_wait_time"], 0),
-                "Throughput": round(r["throughput"], 0),
-            }
-            for r in wtm_results
-        ]
-    )
-    .sort_values("Avg Wait Time (s)")
-    .reset_index(drop=True)
-)
-
-print("\n" + "=" * 100)
-print("WAITING TIME COMPARISON: Fixed vs Backpressure vs Proposed (Live-Dynamic WTM)")
-print("=" * 100)
-print(wtm_comparison_df.to_string(index=False))
-print("=" * 100)
+    
+    print("\n" + "=" * 100)
+    print("WAITING TIME COMPARISON: Fixed vs Backpressure vs Proposed (Live-Dynamic WTM)")
+    print("=" * 100)
+    print(wtm_comparison_df.to_string(index=False))
+    print("=" * 100)
+    
+    # ... (rest of the code)
 
 # --- RESEARCH PLOTS ---
 
@@ -531,7 +548,7 @@ for trial in range(NUM_TRIALS):
     ds = build_demand_schedule(SIMULATION_STEPS, ARRIVAL_RATE, seed)
     for ctrl in controllers_list:
         result = run_simulation_with_waiting_time(
-            G, route_bank, ds, ctrl, topology=topology
+            G, route_bank, ds, ctrl, topology=topology, params=TUNING_PARAMS
         )
         per_trial_data[ctrl].append(result)
     if (trial + 1) % 5 == 0:
@@ -591,7 +608,7 @@ bars = ax1.bar(
     hatch=hatches,
 )
 _annotate_bars(ax1, bars)
-ax1.set_ylabel("Average Queue Length (vehicles) [Lower is Better]")
+ax1.set_ylabel("Average Queue Length (vehicles)")
 ax1.set_ylim(0, max(values) * 1.2)
 ax1.grid(axis="y", alpha=0.3, linestyle="--")
 plt.tight_layout()
@@ -610,7 +627,7 @@ bars = ax2.bar(
     hatch=hatches,
 )
 _annotate_bars(ax2, bars)
-ax2.set_ylabel("Average Travel Time (seconds) [Lower is Better]")
+ax2.set_ylabel("Average Travel Time (minutes)")
 ax2.set_ylim(0, max(values) * 1.2)
 ax2.grid(axis="y", alpha=0.3, linestyle="--")
 plt.tight_layout()
@@ -629,7 +646,7 @@ bars = ax3.bar(
     hatch=hatches,
 )
 _annotate_bars(ax3, bars, fmt="{:.0f}")
-ax3.set_ylabel("Throughput (vehicles) [Higher is Better]")
+ax3.set_ylabel("Throughput (vehicles)")
 ax3.set_ylim(0, max(values) * 1.2)
 ax3.grid(axis="y", alpha=0.3, linestyle="--")
 plt.tight_layout()
@@ -657,7 +674,7 @@ for patch, col, h in zip(bp["boxes"], colors, hatches):
     patch.set_edgecolor(col)
     patch.set_linewidth(1.5)
     patch.set_hatch(h)
-ax4.set_ylabel("Average Waiting Time (seconds) [Lower is Better]")
+ax4.set_ylabel("Average Waiting Time (minutes)")
 ax4.grid(axis="y", alpha=0.3, linestyle="--")
 plt.tight_layout()
 plt.savefig("plot4_waiting_time_distribution.png", dpi=200, bbox_inches="tight")
@@ -713,13 +730,6 @@ for ax_h, ctrl, title in [
     )
     ax_h.set_title(title, fontsize=14, fontweight="bold")
     ax_h.set_aspect("equal")
-cbar_ax = fig5.add_axes([0.15, 0.08, 0.7, 0.03])
-fig5.colorbar(
-    sc,
-    cax=cbar_ax,
-    orientation="horizontal",
-    label="Average Queue (vehicles) [Lower is Better]",
-)
 plt.tight_layout(rect=[0, 0.12, 1, 1])
 plt.savefig("plot5_heatmap_comparison.png", dpi=200, bbox_inches="tight")
 
@@ -761,7 +771,7 @@ for demand_label, rate in demand_levels.items():
         for trial in range(NUM_TRIALS):
             ds = build_demand_schedule(SIMULATION_STEPS, rate, RANDOM_SEED + trial)
             res = run_simulation_with_waiting_time(
-                G, route_bank, ds, ctrl, topology=topology
+                G, route_bank, ds, ctrl, topology=topology, params=TUNING_PARAMS
             )
             tt_l.append(res["avg_travel_time"])
             tp_l.append(res["throughput"])
@@ -786,9 +796,9 @@ for ctrl in controllers_list:
     ax6c.plot(x_pos, demand_results[ctrl]["queue"], marker=mk_map[ctrl], **kw)
 
 for ax_d, ylabel, title in [
-    (ax6a, "Avg Travel Time (seconds) [Lower is Better]", "Travel Time vs Demand"),
-    (ax6b, "Throughput (vehicles) [Higher is Better]", "Throughput vs Demand"),
-    (ax6c, "Avg Queue Length (vehicles) [Lower is Better]", "Queue Length vs Demand"),
+    (ax6a, "Avg Travel Time", "Travel Time vs Demand"),
+    (ax6b, "Throughput", "Throughput vs Demand"),
+    (ax6c, "Avg Queue Length", "Queue Length vs Demand"),
 ]:
     ax_d.set_xticks(x_pos)
     ax_d.set_xticklabels(list(demand_levels.keys()))
