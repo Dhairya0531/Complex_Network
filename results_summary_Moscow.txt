@@ -1,0 +1,9 @@
+TRAFFIC SIMULATION REPORT: Moscow, Russia
+============================================================
+
+WAITING TIME COMPARISON:
+    Controller  Avg Queue  Avg Travel Time  Avg Wait Time  Max Wait Time  Total Wait  Throughput
+PROPOSED (WTM)     760.56            52.95          52.95           88.0     17049.0         322
+  BACKPRESSURE     760.51            52.97          52.97           88.0     17057.0         322
+         FIXED     805.18            54.95          54.95           86.0      6649.0         121
+============================================================
