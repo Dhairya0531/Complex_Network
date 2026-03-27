@@ -805,7 +805,7 @@ print("RESEARCH PLOTS GENERATED")
 print("=" * 60)
 
 report_filename = f"results_summary_{PLACE.split(',')[0].replace(' ', '_')}.txt"
-with open(report_filename, "w") as f:
+with open(report_filename, "w", encoding="utf-8") as f:
     f.write(f"TRAFFIC SIMULATION REPORT: {PLACE}\n")
     f.write("=" * 60 + "\n\n")
     f.write("LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION\n")
