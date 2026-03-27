@@ -5,11 +5,6 @@ import shutil
 
 # List of cities to simulate
 CITIES = [
-    "Nancy, France",
-    "Chandigarh, India",
-    "Berlin, Germany",
-    "Sydney, Australia",
-    "Bengaluru, India",
     "Mumbai, Maharashtra, India",
     "Delhi, India"
 ]
