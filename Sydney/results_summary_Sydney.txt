@@ -1,0 +1,19 @@
+TRAFFIC SIMULATION REPORT: Sydney, Australia
+============================================================
+
+LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
+============================================================
+
+WAITING TIME COMPARISON:
+                 Controller  Avg Queue  Avg Travel Time (s)  Avg Wait Time (s)  Max Wait Time (s)  Total Wait (s)  Throughput
+               BACKPRESSURE     815.49              3345.22            3345.22             4440.0        230820.0          69
+PROPOSED (Live-Dynamic WTM)     815.52              3347.83            3347.83             4440.0        231000.0          69
+                      FIXED     829.08              4640.00            4640.00             5280.0         41760.0           9
+============================================================
+
+NOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic
+green light timing allocation, where each intersection adjusts its
+green duration in real-time based on:
+  - Alpha (α): Current queue pressure relative to capacity
+  - Beta (β): Cumulative waiting time of vehicles
+  - Gamma (γ): Structural importance (Betweenness Centrality)
