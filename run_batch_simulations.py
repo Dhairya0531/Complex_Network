@@ -5,7 +5,9 @@ import shutil
 
 # List of cities to simulate
 CITIES = [
-    "Mumbai, Maharashtra, India",
+    "Pune, Maharashtra, India",
+    "Hyderabad, Telangana, India",
+    "Noida, Uttar Pradesh, India",
     "Delhi, India"
 ]
 

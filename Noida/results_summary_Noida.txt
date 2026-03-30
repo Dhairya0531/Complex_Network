@@ -1,0 +1,19 @@
+TRAFFIC SIMULATION REPORT: Noida, Uttar Pradesh, India
+============================================================
+
+LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
+============================================================
+
+WAITING TIME COMPARISON:
+                 Controller  Avg Queue  Avg Travel Time (s)  Avg Wait Time (s)  Max Wait Time (s)  Total Wait (s)  Throughput
+               BACKPRESSURE     722.83              2628.73            2628.73             5100.0       1035720.0         394
+PROPOSED (Live-Dynamic WTM)     722.68              2638.03            2638.03             5100.0       1044660.0         396
+                      FIXED     797.96              3120.00            3120.00             5400.0        430560.0         138
+============================================================
+
+NOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic
+green light timing allocation, where each intersection adjusts its
+green duration in real-time based on:
+  - Alpha (α): Current queue pressure relative to capacity
+  - Beta (β): Cumulative waiting time of vehicles
+  - Gamma (γ): Structural importance (Betweenness Centrality)

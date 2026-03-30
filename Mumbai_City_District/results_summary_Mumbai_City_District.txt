@@ -1,0 +1,19 @@
+TRAFFIC SIMULATION REPORT: Mumbai City District, Maharashtra, India
+============================================================
+
+LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
+============================================================
+
+WAITING TIME COMPARISON:
+                 Controller  Avg Queue  Avg Travel Time (s)  Avg Wait Time (s)  Max Wait Time (s)  Total Wait (s)  Throughput
+PROPOSED (Live-Dynamic WTM)     703.27              2869.67            2869.67             5280.0       1383180.0         482
+               BACKPRESSURE     706.13              2877.31            2877.31             5340.0       1349460.0         469
+                      FIXED     808.26              3616.47            3616.47             5280.0        368880.0         102
+============================================================
+
+NOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic
+green light timing allocation, where each intersection adjusts its
+green duration in real-time based on:
+  - Alpha (α): Current queue pressure relative to capacity
+  - Beta (β): Cumulative waiting time of vehicles
+  - Gamma (γ): Structural importance (Betweenness Centrality)

@@ -8,7 +8,7 @@ WAITING TIME COMPARISON:
                  Controller  Avg Queue  Avg Travel Time (s)  Avg Wait Time (s)  Max Wait Time (s)  Total Wait (s)  Throughput
                       FIXED     771.61              2464.71            2464.71             5280.0        502800.0         204
                BACKPRESSURE     679.50              2517.33            2517.33             4860.0       1356840.0         539
-PROPOSED (Live-Dynamic WTM)     677.23              2525.13            2525.13             5340.0       1388820.0         550
+PROPOSED (Live-Dynamic WTM)     677.14              2524.25            2524.25             5340.0       1388340.0         550
 ============================================================
 
 NOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic
