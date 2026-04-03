@@ -453,371 +453,372 @@ def run_simulation_with_waiting_time(
     }
 
 
-# --- EVALUATION ---
+if __name__ == "__main__":
+    # --- EVALUATION ---
 
-print("=" * 80)
-print("SIGNAL SCHEDULING COMPARISON: Live-Dynamic Network Awareness")
-print("=" * 80)
+    print("=" * 80)
+    print("SIGNAL SCHEDULING COMPARISON: Live-Dynamic Network Awareness")
+    print("=" * 80)
 
-topology = prepare_topology(G)
-demand_schedule = build_demand_schedule(SIMULATION_STEPS, ARRIVAL_RATE, RANDOM_SEED)
+    topology = prepare_topology(G)
+    demand_schedule = build_demand_schedule(SIMULATION_STEPS, ARRIVAL_RATE, RANDOM_SEED)
 
-controllers_to_test = ["fixed", "backpressure", "dynamic_wtm"]
-wtm_results = []
+    controllers_to_test = ["fixed", "backpressure", "dynamic_wtm"]
+    wtm_results = []
 
-for controller in controllers_to_test:
-    print(f"Testing {controller.upper():15s} ...", end=" ", flush=True)
-    result = run_simulation_with_waiting_time(
-        G, route_bank, demand_schedule, controller, topology=topology
-    )
-    wtm_results.append(result)
-    print("Done")
-
-wtm_comparison_df = (
-    pd.DataFrame(
-        [
-            {
-                "Controller": "PROPOSED (Live-Dynamic WTM)"
-                if r["controller"] == "dynamic_wtm"
-                else r["controller"].upper(),
-                "Avg Queue": round(r["avg_queue_length"], 2),
-                "Avg Travel Time (s)": round(r["avg_travel_time"], 2),
-                "Avg Wait Time (s)": round(r["avg_wait_time"], 2),
-                "Max Wait Time (s)": round(r["max_wait_time"], 2),
-                "Total Wait (s)": round(r["total_wait_time"], 0),
-                "Throughput": round(r["throughput"], 0),
-            }
-            for r in wtm_results
-        ]
-    )
-    .sort_values("Avg Wait Time (s)")
-    .reset_index(drop=True)
-)
-
-print("\n" + "=" * 100)
-print("WAITING TIME COMPARISON: Fixed vs Backpressure vs Proposed (Live-Dynamic WTM)")
-print("=" * 100)
-print(wtm_comparison_df.to_string(index=False))
-print("=" * 100)
-
-# --- RESEARCH PLOTS ---
-
-import folium
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
-
-controllers_list = ["fixed", "backpressure", "dynamic_wtm"]
-controller_labels = {
-    "fixed": "Fixed (Baseline)",
-    "backpressure": "Backpressure",
-    "dynamic_wtm": "Proposed (Live-Dynamic WTM)",
-}
-controller_colors = {
-    "fixed": "#95a5a6",
-    "backpressure": "#3498db",
-    "dynamic_wtm": "#27ae60",
-}
-controller_hatches = {
-    "fixed": "//",
-    "backpressure": "\\\\\\\\",
-    "dynamic_wtm": "xx",
-}
-controller_ls = {"fixed": "--", "backpressure": "-.", "dynamic_wtm": "-"}
-mk_map = {"fixed": "s", "backpressure": "^", "dynamic_wtm": "o"}
-
-per_trial_data = {c: [] for c in controllers_list}
-for trial in range(NUM_TRIALS):
-    seed = RANDOM_SEED + trial
-    ds = build_demand_schedule(SIMULATION_STEPS, ARRIVAL_RATE, seed)
-    for ctrl in controllers_list:
+    for controller in controllers_to_test:
+        print(f"Testing {controller.upper():15s} ...", end=" ", flush=True)
         result = run_simulation_with_waiting_time(
-            G, route_bank, ds, ctrl, topology=topology
+            G, route_bank, demand_schedule, controller, topology=topology
         )
-        per_trial_data[ctrl].append(result)
-    if (trial + 1) % 5 == 0:
-        print(f"Completed trial {trial + 1}/{NUM_TRIALS}")
+        wtm_results.append(result)
+        print("Done")
 
-mean_metrics = {}
-for ctrl in controllers_list:
-    runs = per_trial_data[ctrl]
-    mean_metrics[ctrl] = {
-        "avg_queue": np.mean([r["avg_queue_length"] for r in runs]),
-        "avg_travel_time": np.nanmean([r["avg_travel_time"] for r in runs]),
-        "throughput": np.mean([r["throughput"] for r in runs]),
-        "avg_wait_time": np.nanmean([r["avg_wait_time"] for r in runs]),
-        "max_wait_time": np.mean([r["max_wait_time"] for r in runs]),
-    }
-
-plt.rcParams.update(
-    {
-        "font.size": 12,
-        "axes.titlesize": 14,
-        "axes.labelsize": 12,
-        "xtick.labelsize": 11,
-        "ytick.labelsize": 11,
-    }
-)
-plt.rcParams["hatch.linewidth"] = 2.0
-bar_width = 0.55
-labels = [controller_labels[c] for c in controllers_list]
-colors = [controller_colors[c] for c in controllers_list]
-hatches = [controller_hatches[c] for c in controllers_list]
-
-
-def _annotate_bars(ax, bars, fmt="{:.1f}"):
-    ymax = max(b.get_height() for b in bars)
-    for bar in bars:
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + ymax * 0.02,
-            fmt.format(bar.get_height()),
-            ha="center",
-            va="bottom",
-            fontweight="bold",
-            fontsize=12,
+    wtm_comparison_df = (
+        pd.DataFrame(
+            [
+                {
+                    "Controller": "PROPOSED (Live-Dynamic WTM)"
+                    if r["controller"] == "dynamic_wtm"
+                    else r["controller"].upper(),
+                    "Avg Queue": round(r["avg_queue_length"], 2),
+                    "Avg Travel Time (s)": round(r["avg_travel_time"], 2),
+                    "Avg Wait Time (s)": round(r["avg_wait_time"], 2),
+                    "Max Wait Time (s)": round(r["max_wait_time"], 2),
+                    "Total Wait (s)": round(r["total_wait_time"], 0),
+                    "Throughput": round(r["throughput"], 0),
+                }
+                for r in wtm_results
+            ]
         )
-
-
-# Plot 1
-fig1, ax1 = plt.subplots(figsize=(8, 5))
-values = [mean_metrics[c]["avg_queue"] for c in controllers_list]
-bars = ax1.bar(
-    labels,
-    values,
-    color="white",
-    edgecolor=colors,
-    linewidth=1.5,
-    width=bar_width,
-    hatch=hatches,
-)
-_annotate_bars(ax1, bars)
-ax1.set_ylabel("Average Queue Length (vehicles) [Lower is Better]")
-ax1.set_ylim(0, max(values) * 1.2)
-ax1.grid(axis="y", alpha=0.3, linestyle="--")
-plt.tight_layout()
-plt.savefig("plot1_avg_queue_length.png", dpi=200, bbox_inches="tight")
-
-# Plot 2
-fig2, ax2 = plt.subplots(figsize=(8, 5))
-values = [mean_metrics[c]["avg_travel_time"] for c in controllers_list]
-bars = ax2.bar(
-    labels,
-    values,
-    color="white",
-    edgecolor=colors,
-    linewidth=1.5,
-    width=bar_width,
-    hatch=hatches,
-)
-_annotate_bars(ax2, bars)
-ax2.set_ylabel("Average Travel Time (seconds) [Lower is Better]")
-ax2.set_ylim(0, max(values) * 1.2)
-ax2.grid(axis="y", alpha=0.3, linestyle="--")
-plt.tight_layout()
-plt.savefig("plot2_avg_travel_time.png", dpi=200, bbox_inches="tight")
-
-# Plot 3
-fig3, ax3 = plt.subplots(figsize=(8, 5))
-values = [mean_metrics[c]["throughput"] for c in controllers_list]
-bars = ax3.bar(
-    labels,
-    values,
-    color="white",
-    edgecolor=colors,
-    linewidth=1.5,
-    width=bar_width,
-    hatch=hatches,
-)
-_annotate_bars(ax3, bars, fmt="{:.0f}")
-ax3.set_ylabel("Throughput (vehicles) [Higher is Better]")
-ax3.set_ylim(0, max(values) * 1.2)
-ax3.grid(axis="y", alpha=0.3, linestyle="--")
-plt.tight_layout()
-plt.savefig("plot3_throughput.png", dpi=200, bbox_inches="tight")
-
-# Plot 4
-fig4, ax4 = plt.subplots(figsize=(9, 6))
-wait_distributions = [
-    [r["avg_wait_time"] for r in per_trial_data[c] if not np.isnan(r["avg_wait_time"])]
-    for c in controllers_list
-]
-bp = ax4.boxplot(
-    wait_distributions,
-    tick_labels=labels,
-    patch_artist=True,
-    widths=0.5,
-    showmeans=True,
-    meanprops=dict(
-        marker="D", markeredgecolor="black", markerfacecolor="gold", markersize=8
-    ),
-    medianprops=dict(color="black", linewidth=2),
-)
-for patch, col, h in zip(bp["boxes"], colors, hatches):
-    patch.set_facecolor("white")
-    patch.set_edgecolor(col)
-    patch.set_linewidth(1.5)
-    patch.set_hatch(h)
-ax4.set_ylabel("Average Waiting Time (seconds) [Lower is Better]")
-ax4.grid(axis="y", alpha=0.3, linestyle="--")
-plt.tight_layout()
-plt.savefig("plot4_waiting_time_distribution.png", dpi=200, bbox_inches="tight")
-
-# Heatmaps
-avg_node_q = {}
-for ctrl in ["fixed", "dynamic_wtm"]:
-    d = defaultdict(float)
-    for run in per_trial_data[ctrl]:
-        for node, val in run["avg_node_queue"].items():
-            d[node] += val
-    for node in d:
-        d[node] /= NUM_TRIALS
-    avg_node_q[ctrl] = d
-
-node_coords = {
-    node: (data["y"], data["x"])
-    for node, data in G.nodes(data=True)
-    if "y" in data and "x" in data
-}
-map_center = [
-    (
-        min([c[0] for c in node_coords.values()])
-        + max([c[0] for c in node_coords.values()])
+        .sort_values("Avg Wait Time (s)")
+        .reset_index(drop=True)
     )
-    / 2,
-    (
-        min([c[1] for c in node_coords.values()])
-        + max([c[1] for c in node_coords.values()])
-    )
-    / 2,
-]
 
-all_q_vals = list(avg_node_q["fixed"].values()) + list(
-    avg_node_q["dynamic_wtm"].values()
-)
-vmin_q = 0
-vmax_q = np.percentile(all_q_vals, 95) if all_q_vals else 1.0
-cmap_rg = cm.viridis
+    print("\n" + "=" * 100)
+    print("WAITING TIME COMPARISON: Fixed vs Backpressure vs Proposed (Live-Dynamic WTM)")
+    print("=" * 100)
+    print(wtm_comparison_df.to_string(index=False))
+    print("=" * 100)
 
-fig5, (ax5a, ax5b) = plt.subplots(1, 2, figsize=(16, 7))
-for ax_h, ctrl, title in [
-    (ax5a, "fixed", "Fixed (Baseline)"),
-    (ax5b, "dynamic_wtm", "Proposed (Live-Dynamic WTM)"),
-]:
-    xs, ys, cs = [], [], []
-    for node, coords in node_coords.items():
-        xs.append(coords[1])
-        ys.append(coords[0])
-        cs.append(avg_node_q[ctrl].get(node, 0.0))
-    sc = ax_h.scatter(
-        xs, ys, c=cs, cmap=cmap_rg, s=8, vmin=vmin_q, vmax=vmax_q, alpha=0.85
-    )
-    ax_h.set_title(title, fontsize=14, fontweight="bold")
-    ax_h.set_aspect("equal")
-cbar_ax = fig5.add_axes([0.15, 0.08, 0.7, 0.03])
-fig5.colorbar(
-    sc,
-    cax=cbar_ax,
-    orientation="horizontal",
-    label="Average Queue (vehicles) [Lower is Better]",
-)
-plt.tight_layout(rect=[0, 0.12, 1, 1])
-plt.savefig("plot5_heatmap_comparison.png", dpi=200, bbox_inches="tight")
+    # --- RESEARCH PLOTS ---
 
+    import folium
+    import matplotlib.cm as cm
+    import matplotlib.colors as mcolors
 
-def _make_folium_map(node_queue_dict, title, center, vmin, vmax):
-    m = folium.Map(location=center, zoom_start=13, tiles="CartoDB positron")
-    for node, coords in node_coords.items():
-        val = node_queue_dict.get(node, 0.0)
-        norm = min(1.0, max(0.0, (val - vmin) / (vmax - vmin))) if vmax > vmin else 0.0
-        hex_col = mcolors.rgb2hex(cmap_rg(norm))
-        folium.CircleMarker(
-            location=coords,
-            radius=3 + norm * 8,
-            color=hex_col,
-            fill=True,
-            fillColor=hex_col,
-            fillOpacity=0.8,
-            weight=1,
-        ).add_to(m)
-    return m
+    controllers_list = ["fixed", "backpressure", "dynamic_wtm"]
+    controller_labels = {
+        "fixed": "Fixed (Baseline)",
+        "backpressure": "Backpressure",
+        "dynamic_wtm": "Proposed (Live-Dynamic WTM)",
+    }
+    controller_colors = {
+        "fixed": "#95a5a6",
+        "backpressure": "#3498db",
+        "dynamic_wtm": "#27ae60",
+    }
+    controller_hatches = {
+        "fixed": "//",
+        "backpressure": "\\\\\\\\",
+        "dynamic_wtm": "xx",
+    }
+    controller_ls = {"fixed": "--", "backpressure": "-.", "dynamic_wtm": "-"}
+    mk_map = {"fixed": "s", "backpressure": "^", "dynamic_wtm": "o"}
 
-
-_make_folium_map(avg_node_q["fixed"], "Fixed", map_center, vmin_q, vmax_q).save(
-    "plot5_heatmap_fixed.html"
-)
-_make_folium_map(
-    avg_node_q["dynamic_wtm"], "Proposed (Live-Dynamic WTM)", map_center, vmin_q, vmax_q
-).save("plot5_heatmap_wtm.html")
-
-# Plot 6
-demand_levels = {"Low": 8, "Medium": 18, "High": 30, "Very High": 40}
-demand_results = {
-    c: {"travel_time": [], "throughput": [], "queue": []} for c in controllers_list
-}
-for demand_label, rate in demand_levels.items():
-    print(f"Demand level: {demand_label} ...")
-    for ctrl in controllers_list:
-        tt_l, tp_l, q_l = [], [], []
-        for trial in range(NUM_TRIALS):
-            ds = build_demand_schedule(SIMULATION_STEPS, rate, RANDOM_SEED + trial)
-            res = run_simulation_with_waiting_time(
+    per_trial_data = {c: [] for c in controllers_list}
+    for trial in range(NUM_TRIALS):
+        seed = RANDOM_SEED + trial
+        ds = build_demand_schedule(SIMULATION_STEPS, ARRIVAL_RATE, seed)
+        for ctrl in controllers_list:
+            result = run_simulation_with_waiting_time(
                 G, route_bank, ds, ctrl, topology=topology
             )
-            tt_l.append(res["avg_travel_time"])
-            tp_l.append(res["throughput"])
-            q_l.append(res["avg_queue_length"])
-        demand_results[ctrl]["travel_time"].append(np.nanmean(tt_l))
-        demand_results[ctrl]["throughput"].append(np.mean(tp_l))
-        demand_results[ctrl]["queue"].append(np.mean(q_l))
+            per_trial_data[ctrl].append(result)
+        if (trial + 1) % 5 == 0:
+            print(f"Completed trial {trial + 1}/{NUM_TRIALS}")
 
-fig6, (ax6a, ax6b, ax6c) = plt.subplots(1, 3, figsize=(18, 5.5))
-x_pos = np.arange(len(demand_levels))
-for ctrl in controllers_list:
-    kw = dict(
-        color=controller_colors[ctrl],
-        linewidth=2.5,
-        markersize=9,
-        label=controller_labels[ctrl],
-        markeredgecolor="black",
-        linestyle=controller_ls[ctrl],
+    mean_metrics = {}
+    for ctrl in controllers_list:
+        runs = per_trial_data[ctrl]
+        mean_metrics[ctrl] = {
+            "avg_queue": np.mean([r["avg_queue_length"] for r in runs]),
+            "avg_travel_time": np.nanmean([r["avg_travel_time"] for r in runs]),
+            "throughput": np.mean([r["throughput"] for r in runs]),
+            "avg_wait_time": np.nanmean([r["avg_wait_time"] for r in runs]),
+            "max_wait_time": np.mean([r["max_wait_time"] for r in runs]),
+        }
+
+    plt.rcParams.update(
+        {
+            "font.size": 12,
+            "axes.titlesize": 14,
+            "axes.labelsize": 12,
+            "xtick.labelsize": 11,
+            "ytick.labelsize": 11,
+        }
     )
-    ax6a.plot(x_pos, demand_results[ctrl]["travel_time"], marker=mk_map[ctrl], **kw)
-    ax6b.plot(x_pos, demand_results[ctrl]["throughput"], marker=mk_map[ctrl], **kw)
-    ax6c.plot(x_pos, demand_results[ctrl]["queue"], marker=mk_map[ctrl], **kw)
+    plt.rcParams["hatch.linewidth"] = 2.0
+    bar_width = 0.55
+    labels = [controller_labels[c] for c in controllers_list]
+    colors = [controller_colors[c] for c in controllers_list]
+    hatches = [controller_hatches[c] for c in controllers_list]
 
-for ax_d, ylabel, title in [
-    (ax6a, "Avg Travel Time (seconds) [Lower is Better]", "Travel Time vs Demand"),
-    (ax6b, "Throughput (vehicles) [Higher is Better]", "Throughput vs Demand"),
-    (ax6c, "Avg Queue Length (vehicles) [Lower is Better]", "Queue Length vs Demand"),
-]:
-    ax_d.set_xticks(x_pos)
-    ax_d.set_xticklabels(list(demand_levels.keys()))
-    ax_d.set_ylabel(ylabel)
-    ax_d.set_title(title, fontweight="bold")
-    ax_d.grid(alpha=0.3, linestyle="--")
-handles, labels_leg = ax6a.get_legend_handles_labels()
-fig6.legend(handles, labels_leg, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 0.98))
-plt.tight_layout(rect=[0, 0, 1, 0.88])
-plt.savefig("plot6_performance_vs_demand.png", dpi=200, bbox_inches="tight")
 
-print("\n" + "=" * 60)
-print("RESEARCH PLOTS GENERATED")
-print("=" * 60)
+    def _annotate_bars(ax, bars, fmt="{:.1f}"):
+        ymax = max(b.get_height() for b in bars)
+        for bar in bars:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + ymax * 0.02,
+                fmt.format(bar.get_height()),
+                ha="center",
+                va="bottom",
+                fontweight="bold",
+                fontsize=12,
+            )
 
-report_filename = f"results_summary_{PLACE.split(',')[0].replace(' ', '_')}.txt"
-with open(report_filename, "w", encoding="utf-8") as f:
-    f.write(f"TRAFFIC SIMULATION REPORT: {PLACE}\n")
-    f.write("=" * 60 + "\n\n")
-    f.write("LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION\n")
-    f.write("=" * 60 + "\n\n")
-    f.write("WAITING TIME COMPARISON:\n")
-    f.write(wtm_comparison_df.to_string(index=False))
-    f.write("\n" + "=" * 60 + "\n")
-    f.write("\nNOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic\n")
-    f.write("green light timing allocation, where each intersection adjusts its\n")
-    f.write("green duration in real-time based on:\n")
-    f.write("  - Alpha (α): Current queue pressure relative to capacity\n")
-    f.write("  - Beta (β): Cumulative waiting time of vehicles\n")
-    f.write("  - Gamma (γ): Structural importance (Betweenness Centrality)\n")
 
-print(f"\nResults saved to: {report_filename}\n")
+    # Plot 1
+    fig1, ax1 = plt.subplots(figsize=(8, 5))
+    values = [mean_metrics[c]["avg_queue"] for c in controllers_list]
+    bars = ax1.bar(
+        labels,
+        values,
+        color="white",
+        edgecolor=colors,
+        linewidth=1.5,
+        width=bar_width,
+        hatch=hatches,
+    )
+    _annotate_bars(ax1, bars)
+    ax1.set_ylabel("Average Queue Length (vehicles) [Lower is Better]")
+    ax1.set_ylim(0, max(values) * 1.2)
+    ax1.grid(axis="y", alpha=0.3, linestyle="--")
+    plt.tight_layout()
+    plt.savefig("plot1_avg_queue_length.png", dpi=200, bbox_inches="tight")
+
+    # Plot 2
+    fig2, ax2 = plt.subplots(figsize=(8, 5))
+    values = [mean_metrics[c]["avg_travel_time"] for c in controllers_list]
+    bars = ax2.bar(
+        labels,
+        values,
+        color="white",
+        edgecolor=colors,
+        linewidth=1.5,
+        width=bar_width,
+        hatch=hatches,
+    )
+    _annotate_bars(ax2, bars)
+    ax2.set_ylabel("Average Travel Time (seconds) [Lower is Better]")
+    ax2.set_ylim(0, max(values) * 1.2)
+    ax2.grid(axis="y", alpha=0.3, linestyle="--")
+    plt.tight_layout()
+    plt.savefig("plot2_avg_travel_time.png", dpi=200, bbox_inches="tight")
+
+    # Plot 3
+    fig3, ax3 = plt.subplots(figsize=(8, 5))
+    values = [mean_metrics[c]["throughput"] for c in controllers_list]
+    bars = ax3.bar(
+        labels,
+        values,
+        color="white",
+        edgecolor=colors,
+        linewidth=1.5,
+        width=bar_width,
+        hatch=hatches,
+    )
+    _annotate_bars(ax3, bars, fmt="{:.0f}")
+    ax3.set_ylabel("Throughput (vehicles) [Higher is Better]")
+    ax3.set_ylim(0, max(values) * 1.2)
+    ax3.grid(axis="y", alpha=0.3, linestyle="--")
+    plt.tight_layout()
+    plt.savefig("plot3_throughput.png", dpi=200, bbox_inches="tight")
+
+    # Plot 4
+    fig4, ax4 = plt.subplots(figsize=(9, 6))
+    wait_distributions = [
+        [r["avg_wait_time"] for r in per_trial_data[c] if not np.isnan(r["avg_wait_time"])]
+        for c in controllers_list
+    ]
+    bp = ax4.boxplot(
+        wait_distributions,
+        tick_labels=labels,
+        patch_artist=True,
+        widths=0.5,
+        showmeans=True,
+        meanprops=dict(
+            marker="D", markeredgecolor="black", markerfacecolor="gold", markersize=8
+        ),
+        medianprops=dict(color="black", linewidth=2),
+    )
+    for patch, col, h in zip(bp["boxes"], colors, hatches):
+        patch.set_facecolor("white")
+        patch.set_edgecolor(col)
+        patch.set_linewidth(1.5)
+        patch.set_hatch(h)
+    ax4.set_ylabel("Average Waiting Time (seconds) [Lower is Better]")
+    ax4.grid(axis="y", alpha=0.3, linestyle="--")
+    plt.tight_layout()
+    plt.savefig("plot4_waiting_time_distribution.png", dpi=200, bbox_inches="tight")
+
+    # Heatmaps
+    avg_node_q = {}
+    for ctrl in ["fixed", "dynamic_wtm"]:
+        d = defaultdict(float)
+        for run in per_trial_data[ctrl]:
+            for node, val in run["avg_node_queue"].items():
+                d[node] += val
+        for node in d:
+            d[node] /= NUM_TRIALS
+        avg_node_q[ctrl] = d
+
+    node_coords = {
+        node: (data["y"], data["x"])
+        for node, data in G.nodes(data=True)
+        if "y" in data and "x" in data
+    }
+    map_center = [
+        (
+            min([c[0] for c in node_coords.values()])
+            + max([c[0] for c in node_coords.values()])
+        )
+        / 2,
+        (
+            min([c[1] for c in node_coords.values()])
+            + max([c[1] for c in node_coords.values()])
+        )
+        / 2,
+    ]
+
+    all_q_vals = list(avg_node_q["fixed"].values()) + list(
+        avg_node_q["dynamic_wtm"].values()
+    )
+    vmin_q = 0
+    vmax_q = np.percentile(all_q_vals, 95) if all_q_vals else 1.0
+    cmap_rg = cm.viridis
+
+    fig5, (ax5a, ax5b) = plt.subplots(1, 2, figsize=(16, 7))
+    for ax_h, ctrl, title in [
+        (ax5a, "fixed", "Fixed (Baseline)"),
+        (ax5b, "dynamic_wtm", "Proposed (Live-Dynamic WTM)"),
+    ]:
+        xs, ys, cs = [], [], []
+        for node, coords in node_coords.items():
+            xs.append(coords[1])
+            ys.append(coords[0])
+            cs.append(avg_node_q[ctrl].get(node, 0.0))
+        sc = ax_h.scatter(
+            xs, ys, c=cs, cmap=cmap_rg, s=8, vmin=vmin_q, vmax=vmax_q, alpha=0.85
+        )
+        ax_h.set_title(title, fontsize=14, fontweight="bold")
+        ax_h.set_aspect("equal")
+    cbar_ax = fig5.add_axes([0.15, 0.08, 0.7, 0.03])
+    fig5.colorbar(
+        sc,
+        cax=cbar_ax,
+        orientation="horizontal",
+        label="Average Queue (vehicles) [Lower is Better]",
+    )
+    plt.tight_layout(rect=[0, 0.12, 1, 1])
+    plt.savefig("plot5_heatmap_comparison.png", dpi=200, bbox_inches="tight")
+
+
+    def _make_folium_map(node_queue_dict, title, center, vmin, vmax):
+        m = folium.Map(location=center, zoom_start=13, tiles="CartoDB positron")
+        for node, coords in node_coords.items():
+            val = node_queue_dict.get(node, 0.0)
+            norm = min(1.0, max(0.0, (val - vmin) / (vmax - vmin))) if vmax > vmin else 0.0
+            hex_col = mcolors.rgb2hex(cmap_rg(norm))
+            folium.CircleMarker(
+                location=coords,
+                radius=3 + norm * 8,
+                color=hex_col,
+                fill=True,
+                fillColor=hex_col,
+                fillOpacity=0.8,
+                weight=1,
+            ).add_to(m)
+        return m
+
+
+    _make_folium_map(avg_node_q["fixed"], "Fixed", map_center, vmin_q, vmax_q).save(
+        "plot5_heatmap_fixed.html"
+    )
+    _make_folium_map(
+        avg_node_q["dynamic_wtm"], "Proposed (Live-Dynamic WTM)", map_center, vmin_q, vmax_q
+    ).save("plot5_heatmap_wtm.html")
+
+    # Plot 6
+    demand_levels = {"Low": 8, "Medium": 18, "High": 30, "Very High": 40}
+    demand_results = {
+        c: {"travel_time": [], "throughput": [], "queue": []} for c in controllers_list
+    }
+    for demand_label, rate in demand_levels.items():
+        print(f"Demand level: {demand_label} ...")
+        for ctrl in controllers_list:
+            tt_l, tp_l, q_l = [], [], []
+            for trial in range(NUM_TRIALS):
+                ds = build_demand_schedule(SIMULATION_STEPS, rate, RANDOM_SEED + trial)
+                res = run_simulation_with_waiting_time(
+                    G, route_bank, ds, ctrl, topology=topology
+                )
+                tt_l.append(res["avg_travel_time"])
+                tp_l.append(res["throughput"])
+                q_l.append(res["avg_queue_length"])
+            demand_results[ctrl]["travel_time"].append(np.nanmean(tt_l))
+            demand_results[ctrl]["throughput"].append(np.mean(tp_l))
+            demand_results[ctrl]["queue"].append(np.mean(q_l))
+
+    fig6, (ax6a, ax6b, ax6c) = plt.subplots(1, 3, figsize=(18, 5.5))
+    x_pos = np.arange(len(demand_levels))
+    for ctrl in controllers_list:
+        kw = dict(
+            color=controller_colors[ctrl],
+            linewidth=2.5,
+            markersize=9,
+            label=controller_labels[ctrl],
+            markeredgecolor="black",
+            linestyle=controller_ls[ctrl],
+        )
+        ax6a.plot(x_pos, demand_results[ctrl]["travel_time"], marker=mk_map[ctrl], **kw)
+        ax6b.plot(x_pos, demand_results[ctrl]["throughput"], marker=mk_map[ctrl], **kw)
+        ax6c.plot(x_pos, demand_results[ctrl]["queue"], marker=mk_map[ctrl], **kw)
+
+    for ax_d, ylabel, title in [
+        (ax6a, "Avg Travel Time (seconds) [Lower is Better]", "Travel Time vs Demand"),
+        (ax6b, "Throughput (vehicles) [Higher is Better]", "Throughput vs Demand"),
+        (ax6c, "Avg Queue Length (vehicles) [Lower is Better]", "Queue Length vs Demand"),
+    ]:
+        ax_d.set_xticks(x_pos)
+        ax_d.set_xticklabels(list(demand_levels.keys()))
+        ax_d.set_ylabel(ylabel)
+        ax_d.set_title(title, fontweight="bold")
+        ax_d.grid(alpha=0.3, linestyle="--")
+    handles, labels_leg = ax6a.get_legend_handles_labels()
+    fig6.legend(handles, labels_leg, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 0.98))
+    plt.tight_layout(rect=[0, 0, 1, 0.88])
+    plt.savefig("plot6_performance_vs_demand.png", dpi=200, bbox_inches="tight")
+
+    print("\n" + "=" * 60)
+    print("RESEARCH PLOTS GENERATED")
+    print("=" * 60)
+
+    report_filename = f"results_summary_{PLACE.split(',')[0].replace(' ', '_')}.txt"
+    with open(report_filename, "w", encoding="utf-8") as f:
+        f.write(f"TRAFFIC SIMULATION REPORT: {PLACE}\n")
+        f.write("=" * 60 + "\n\n")
+        f.write("LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION\n")
+        f.write("=" * 60 + "\n\n")
+        f.write("WAITING TIME COMPARISON:\n")
+        f.write(wtm_comparison_df.to_string(index=False))
+        f.write("\n" + "=" * 60 + "\n")
+        f.write("\nNOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic\n")
+        f.write("green light timing allocation, where each intersection adjusts its\n")
+        f.write("green duration in real-time based on:\n")
+        f.write("  - Alpha (α): Current queue pressure relative to capacity\n")
+        f.write("  - Beta (β): Cumulative waiting time of vehicles\n")
+        f.write("  - Gamma (γ): Structural importance (Betweenness Centrality)\n")
+
+    print(f"\nResults saved to: {report_filename}\n")

@@ -1,0 +1,4 @@
+City,Alpha Formula,Beta Formula,Gamma Formula,Final Travel Time
+Bengaluru,0.50 + 0.50*deg,0.50*(1-BC),0.20 + 0.80*BC,nans
+Berlin,0.50 + 0.50*deg,0.50*(1-BC),0.20 + 0.80*BC,nans
+Sydney,0.50 + 0.50*deg,0.50*(1-BC),0.20 + 0.80*BC,nans
