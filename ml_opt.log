@@ -1,0 +1,31 @@
+Fetching network for: Nancy, France
+Graph downloaded successfully
+Nodes: 1333
+Edges: 2771
+Candidate intersections: 1333
+Routes prepared: 40
+Vehicles scheduled: 1646
+
+>>> Starting Multi-City Optimization: Bengaluru <<<
+Learned for Bengaluru: Alpha=0.50+0.50*deg | Beta=0.50*(1-BC) | Gamma=0.20+0.80*BC
+
+>>> Starting Multi-City Optimization: Berlin <<<
+Learned for Berlin: Alpha=0.50+0.50*deg | Beta=0.50*(1-BC) | Gamma=0.20+0.80*BC
+
+>>> Starting Multi-City Optimization: London <<<
+Learned for London: Alpha=0.50+0.50*deg | Beta=0.50*(1-BC) | Gamma=0.20+0.80*BC
+
+>>> Starting Multi-City Optimization: Sydney <<<
+Learned for Sydney: Alpha=0.50+0.50*deg | Beta=0.50*(1-BC) | Gamma=0.20+0.80*BC
+
+================================================================================
+MULTI-CITY CROSS-VALIDATION SUMMARY
+================================================================================
+     City   Alpha Formula Beta Formula  Gamma Formula Final Travel Time
+Bengaluru 0.50 + 0.50*deg  0.50*(1-BC) 0.20 + 0.80*BC              nans
+   Berlin 0.50 + 0.50*deg  0.50*(1-BC) 0.20 + 0.80*BC              nans
+   London 0.50 + 0.50*deg  0.50*(1-BC) 0.20 + 0.80*BC              nans
+   Sydney 0.50 + 0.50*deg  0.50*(1-BC) 0.20 + 0.80*BC              nans
+================================================================================
+
+Comparison plot saved as 'multi_city_convergence_comparison.png'

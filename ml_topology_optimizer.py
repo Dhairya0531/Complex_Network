@@ -167,12 +167,20 @@ def run_multi_city_validation():
     print("=" * 80)
 
     # Plot Comparison of Convergence
+    plt.rcParams.update({
+        'font.size': 14,
+        'axes.titlesize': 18,
+        'axes.labelsize': 16,
+        'xtick.labelsize': 14,
+        'ytick.labelsize': 14,
+        'legend.fontsize': 14
+    })
     plt.figure(figsize=(10, 6))
     for label, res in all_results.items():
         # Normalize history to show % improvement
         start = res["history"][0]
         norm_hist = [100 * (h / start) for h in res["history"]]
-        plt.plot(norm_hist, label=f"{label} (Optimized)", linewidth=2)
+        plt.plot(norm_hist, label=f"{label} (Optimized)", linewidth=3)
 
     plt.title("Formula Optimization Efficiency Across Multiple City Topologies")
     plt.xlabel("Epoch")

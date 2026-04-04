@@ -101,7 +101,15 @@ def run_full_analysis(city_name, city_label):
             demand_data[ctrl]["tp"].append(np.mean(tp_l))
 
     # --- PLOTTING ---
-    plt.rcParams.update({'font.size': 11, 'axes.linewidth': 1.2})
+    plt.rcParams.update({
+        'font.size': 14,
+        'axes.titlesize': 16,
+        'axes.labelsize': 16,
+        'xtick.labelsize': 14,
+        'ytick.labelsize': 14,
+        'legend.fontsize': 14,
+        'axes.linewidth': 1.5
+    })
     # RGB Palette: Fixed (Red), Backpressure (Blue), Proposed (Green)
     # Optimized for Greyscale: Light/Dotted, Medium/Dashed, Dark/Solid
     colors = {"fixed": "#e74c3c", "backpressure": "#3498db", "dynamic_wtm": "#27ae60"}
@@ -195,8 +203,8 @@ def create_final_grid():
     
     # Try to load a font, fallback to default
     try:
-        font_large = ImageFont.truetype("arial.ttf", 80)
-        font_med = ImageFont.truetype("arial.ttf", 60)
+        font_large = ImageFont.truetype("arial.ttf", 100)
+        font_med = ImageFont.truetype("arial.ttf", 80)
     except:
         font_large = ImageFont.load_default()
         font_med = ImageFont.load_default()

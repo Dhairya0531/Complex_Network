@@ -1,0 +1,19 @@
+TRAFFIC SIMULATION REPORT: Strasbourg, France
+============================================================
+
+LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
+============================================================
+
+WAITING TIME COMPARISON:
+                 Controller  Avg Queue  Avg Travel Time (s)  Avg Wait Time (s)  Max Wait Time (s)  Total Wait (s)  Throughput
+PROPOSED (Live-Dynamic WTM)     595.42              2124.84            2124.84            13140.0       1570260.0         739
+               BACKPRESSURE     599.72              2153.88            2176.22            13680.0       1577760.0         725
+                      FIXED     748.09              2787.87            2811.48            15600.0        871560.0         310
+============================================================
+
+NOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic
+green light timing allocation, where each intersection adjusts its
+green duration in real-time based on:
+  - Alpha (α): Current queue pressure relative to capacity
+  - Beta (β): Cumulative waiting time of vehicles
+  - Gamma (γ): Structural importance (Betweenness Centrality)

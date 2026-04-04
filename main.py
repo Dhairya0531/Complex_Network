@@ -196,18 +196,21 @@ def prepare_topology(graph):
     )
 
     incoming_idx = [[] for _ in range(num_nodes)]
-    for i, target in enumerate(edge_target_idx):
-        incoming_idx[target].append(i)
+    outgoing_idx = [[] for _ in range(num_nodes)]
+    for i, (src, tgt) in enumerate(zip(edge_source_idx, edge_target_idx)):
+        incoming_idx[tgt].append(i)
+        outgoing_idx[src].append(i)
 
     node_in_counts = np.array([len(e) for e in incoming_idx], dtype=float)
     node_in_counts_fixed = np.where(node_in_counts == 0, 1.0, node_in_counts)
     incoming_idx = [np.array(e, dtype=int) for e in incoming_idx]
+    outgoing_idx = [np.array(e, dtype=int) for e in outgoing_idx]
 
     node_importance = np.array(
         [float(graph.nodes[n].get("betweenness_norm", 0.0)) for n in nodes], dtype=float
     )
 
-    # DYNAMIC TOPOLOGY SCALING
+    # DYNAMIC TOPOLOGY SCALING (Eqs. 7-9 in paper)
     alpha_dynamic = 0.5 + 0.5 * (
         node_in_counts / max(1.0, np.max(node_in_counts_fixed))
     )
@@ -218,27 +221,16 @@ def prepare_topology(graph):
         1, np.floor(edge_caps / node_in_counts_fixed[edge_target_idx])
     ).astype(int)
 
-    # Base priority for green time scaling using dynamic weights
-    best_priority = alpha_dynamic + beta_dynamic * node_importance
-    green_proposed = MIN_GREEN + (MAX_GREEN - MIN_GREEN) * np.maximum(
-        0.0, best_priority
-    )
-    move_cap_proposed = np.maximum(
-        1, np.floor(edge_caps * (green_proposed[edge_target_idx] / CYCLE_TIME))
-    ).astype(int)
-
     return {
         "nodes": nodes,
         "node_to_idx": node_to_idx,
         "edge_to_idx": edge_to_idx,
         "edges": edges,
         "incoming_idx": incoming_idx,
+        "outgoing_idx": outgoing_idx,
         "edge_target_idx": edge_target_idx,
         "edge_source_idx": edge_source_idx,
         "move_cap_fixed": move_cap_fixed,
-        "move_cap_proposed": move_cap_proposed,
-        "green_fixed": CYCLE_TIME / node_in_counts_fixed,
-        "green_proposed": green_proposed,
         "num_nodes": num_nodes,
         "num_edges": num_edges,
         "node_importance": node_importance,
@@ -271,12 +263,14 @@ def choose_edge_for_node_wtm(
     for i, edge_idx in enumerate(incoming):
         queue = edge_queues[edge_idx]
         if len(queue) > 0:
-            wait_times = [step - arrival_step for _, arrival_step, _ in queue]
+            # Wait times use arrival_at_edge_step (3rd element in 4-tuple)
+            wait_times = [step - arrival_at_edge_step for _, _, arrival_at_edge_step, _ in queue]
             cumulative_wait[i] = np.sum(wait_times)
 
-    # Normalize metrics for selection consistent with timing logic
+    # Normalize metrics for selection consistent with timing logic.
+    # We remove CYCLE_TIME from wait_pressure because wait_times is in cycles (steps).
     queue_pressure = queue_counts[incoming] / np.maximum(1.0, edge_caps[incoming])
-    wait_pressure = cumulative_wait / np.maximum(1.0, edge_caps[incoming] * CYCLE_TIME)
+    wait_pressure = cumulative_wait / np.maximum(1.0, edge_caps[incoming])
     source_importance = node_importance[edge_source_idx[incoming]]
 
     # MULTIPLICATIVE HUB AWARENESS: Hub status acts as a multiplier to traffic signals.
@@ -311,16 +305,12 @@ def run_simulation_with_waiting_time(
     beta_dynamic = topology["beta_dynamic"]
     gamma_dynamic = topology["gamma_dynamic"]
 
+    outgoing_idx = topology["outgoing_idx"]
+
     indexed_routes = [[edge_to_idx[e] for e in r["edges"]] for r in route_bank]
     edge_queues = [deque() for _ in range(num_edges)]
     queue_counts = np.zeros(num_edges, dtype=int)
-
-    if controller == "fixed" or controller == "backpressure":
-        move_caps = topology["move_cap_fixed"]
-    elif controller == "dynamic_wtm":
-        move_caps = topology["move_cap_proposed"]
-    else:
-        raise ValueError(f"Unknown controller: {controller}")
+    move_caps = topology["move_cap_fixed"]  # used by fixed & backpressure
 
     completed_travel_times = []
     completed_wait_times = []
@@ -328,6 +318,8 @@ def run_simulation_with_waiting_time(
     node_queue_totals = np.zeros(num_nodes, dtype=float)
     node_queue_peaks = np.zeros(num_nodes, dtype=float)
     queue_history = []
+    # Per-vehicle cumulative wait tracker: vehicle_id -> total wait steps
+    vehicle_wait_accumulator = defaultdict(float)
 
     for step, arrivals in enumerate(demand_schedule):
         transfers = []
@@ -339,6 +331,7 @@ def run_simulation_with_waiting_time(
                 if controller == "fixed":
                     selected_idx = incoming[step % len(incoming)]
                 elif controller == "backpressure":
+                    # Simplified max-pressure: routing-agnostic highest incoming queue
                     selected_idx = incoming[np.argmax(queue_counts[incoming])]
                 elif controller == "dynamic_wtm":
                     selected_idx, wait_time_sum = choose_edge_for_node_wtm(
@@ -363,16 +356,14 @@ def run_simulation_with_waiting_time(
                     # Calculate Queue Pressure (Alpha term)
                     queue_pressure = queue_counts[selected_idx] / max(1.0, edge_cap)
 
-                    # Calculate Wait Pressure (Beta term)
-                    wait_pressure = wait_time_sum / max(1.0, edge_cap * CYCLE_TIME)
+                    # Calculate Wait Pressure (Beta term). Corrected scaling (removed CYCLE_TIME)
+                    wait_pressure = wait_time_sum / max(1.0, edge_cap)
 
                     # Calculate Structural Importance (Gamma term)
                     source_node_idx = edge_source_idx[selected_idx]
                     importance_bonus = node_importance[source_node_idx]
 
                     # MULTIPLICATIVE SITUATIONAL PRIORITY:
-                    # Hub awareness amplifies existing traffic demand.
-                    # This prevents wasting green time on empty important roads.
                     situational_priority = np.clip(
                         (a * queue_pressure + b * wait_pressure)
                         * (1.0 + g * importance_bonus),
@@ -398,26 +389,36 @@ def run_simulation_with_waiting_time(
                 if move_count > 0:
                     q = edge_queues[selected_idx]
                     for _ in range(move_count):
-                        r_idx, s_step, pos = q.popleft()
-                        transfers.append((r_idx, s_step, pos + 1))
+                        # vehicle_id is based on original injection_step
+                        r_idx, injection_step, arrival_at_edge_step, pos = q.popleft()
+                        vehicle_id = (r_idx, injection_step)
+                        # Accumulate wait time at this specific edge
+                        vehicle_wait_accumulator[vehicle_id] += max(0, step - arrival_at_edge_step)
+                        transfers.append((r_idx, injection_step, pos + 1, step))
                     queue_counts[selected_idx] -= move_count
 
-        for r_idx, s_step, next_pos in transfers:
+        for r_idx, injection_step, next_pos, serve_step in transfers:
             route = indexed_routes[r_idx]
             if next_pos >= len(route):
-                travel_time = step - s_step + 1
+                # Total travel time: current step minus initial injection step
+                # serve_step is current step here
+                travel_time = serve_step - injection_step
                 completed_travel_times.append(travel_time)
-                completed_wait_times.append(travel_time)
+                vehicle_id = (r_idx, injection_step)
+                completed_wait_times.append(vehicle_wait_accumulator.pop(vehicle_id, 0.0))
             else:
                 next_e = route[next_pos]
-                edge_queues[next_e].append((r_idx, s_step, next_pos))
+                # Pass injection_step through and set serve_step as new arrival_at_edge_step
+                edge_queues[next_e].append((r_idx, injection_step, serve_step, next_pos))
                 queue_counts[next_e] += 1
 
         for route_id in arrivals:
             start_e = indexed_routes[route_id][0]
-            edge_queues[start_e].append((route_id, step, 0))
+            # (r_idx, injection_step, arrival_at_edge_step, pos)
+            edge_queues[start_e].append((route_id, step, step, 0))
             queue_counts[start_e] += 1
             total_injected += 1
+            vehicle_wait_accumulator[(route_id, step)] = 0.0
 
         node_queues = np.bincount(
             edge_target_idx, weights=queue_counts.astype(float), minlength=num_nodes
@@ -593,7 +594,9 @@ if __name__ == "__main__":
     )
     _annotate_bars(ax1, bars)
     ax1.set_ylabel("Average Queue Length (vehicles) [Lower is Better]")
-    ax1.set_ylim(0, max(values) * 1.2)
+    clean_vals = [v for v in values if v is not None and not np.isnan(v)]
+    if clean_vals:
+        ax1.set_ylim(0, max(clean_vals) * 1.2)
     ax1.grid(axis="y", alpha=0.3, linestyle="--")
     plt.tight_layout()
     plt.savefig("plot1_avg_queue_length.png", dpi=200, bbox_inches="tight")
@@ -612,7 +615,9 @@ if __name__ == "__main__":
     )
     _annotate_bars(ax2, bars)
     ax2.set_ylabel("Average Travel Time (seconds) [Lower is Better]")
-    ax2.set_ylim(0, max(values) * 1.2)
+    clean_vals = [v for v in values if v is not None and not np.isnan(v)]
+    if clean_vals:
+        ax2.set_ylim(0, max(clean_vals) * 1.2)
     ax2.grid(axis="y", alpha=0.3, linestyle="--")
     plt.tight_layout()
     plt.savefig("plot2_avg_travel_time.png", dpi=200, bbox_inches="tight")
@@ -631,7 +636,9 @@ if __name__ == "__main__":
     )
     _annotate_bars(ax3, bars, fmt="{:.0f}")
     ax3.set_ylabel("Throughput (vehicles) [Higher is Better]")
-    ax3.set_ylim(0, max(values) * 1.2)
+    clean_vals = [v for v in values if v is not None and not np.isnan(v)]
+    if clean_vals:
+        ax3.set_ylim(0, max(clean_vals) * 1.2)
     ax3.grid(axis="y", alpha=0.3, linestyle="--")
     plt.tight_layout()
     plt.savefig("plot3_throughput.png", dpi=200, bbox_inches="tight")

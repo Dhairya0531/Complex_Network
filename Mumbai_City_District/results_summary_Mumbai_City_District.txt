@@ -1,4 +1,4 @@
-TRAFFIC SIMULATION REPORT: Mumbai City District, Maharashtra, India
+TRAFFIC SIMULATION REPORT: Mumbai City District, India
 ============================================================
 
 LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
@@ -6,9 +6,9 @@ LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
 
 WAITING TIME COMPARISON:
                  Controller  Avg Queue  Avg Travel Time (s)  Avg Wait Time (s)  Max Wait Time (s)  Total Wait (s)  Throughput
-PROPOSED (Live-Dynamic WTM)     703.27              2869.67            2869.67             5280.0       1383180.0         482
-               BACKPRESSURE     706.13              2877.31            2877.31             5340.0       1349460.0         469
-                      FIXED     808.26              3616.47            3616.47             5280.0        368880.0         102
+PROPOSED (Live-Dynamic WTM)     677.71              2685.45            2685.45            13920.0       1616640.0         602
+               BACKPRESSURE     682.10              2700.52            2719.52            13920.0       1580040.0         581
+                      FIXED     793.49              3423.75            3423.75            12720.0        602580.0         176
 ============================================================
 
 NOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic

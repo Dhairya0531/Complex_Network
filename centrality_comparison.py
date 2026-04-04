@@ -118,7 +118,15 @@ def run_multi_city_comparison():
     print("="*60)
     
     # Plotting
-    pivot_df.plot(kind='bar', figsize=(12, 7), edgecolor='black', linewidth=1.2, 
+    plt.rcParams.update({
+        'font.size': 14,
+        'axes.titlesize': 18,
+        'axes.labelsize': 16,
+        'xtick.labelsize': 14,
+        'ytick.labelsize': 14,
+        'legend.fontsize': 14
+    })
+    pivot_df.plot(kind='bar', figsize=(12, 7), edgecolor='black', linewidth=1.5, 
                   color=['#2e86de', '#95a5a6', '#f1c40f', '#e74c3c'])
     plt.ylabel("Average Travel Time (seconds)")
     plt.title("Centrality Measure Impact Across Different Topologies")
