@@ -23,8 +23,8 @@ SIMULATION_STEPS = 90
 CYCLE_TIME = 60
 MIN_GREEN = 15
 MAX_GREEN = 45
-ARRIVAL_RATE = 18
-NUM_OD_PAIRS = 40
+ARRIVAL_RATE = 200
+NUM_OD_PAIRS = 20
 NUM_TRIALS = 20
 BETWEENNESS_K = 80
 
@@ -131,13 +131,22 @@ print(f"Candidate intersections: {len(candidate_nodes)}")
 
 # --- TRAFFIC DEMAND ---
 
+# Identify the busiest "downtown" hub using betweenness centrality
+hub_node = max(node_importance, key=node_importance.get)
+# Create a local operational zone (e.g., 30 edge hops from the hub) to force congestion
+local_neighborhood = nx.single_source_shortest_path_length(G, hub_node, cutoff=30)
+local_candidates = [n for n in candidate_nodes if n in local_neighborhood]
+
+if len(local_candidates) < 20: 
+    local_candidates = candidate_nodes # Fallback if graph is tiny
+
 route_bank = []
 route_keys = set()
 attempts = 0
-max_attempts = NUM_OD_PAIRS * 40
+max_attempts = NUM_OD_PAIRS * 100
 
 while len(route_bank) < NUM_OD_PAIRS and attempts < max_attempts:
-    origin, destination = rng.choice(candidate_nodes, size=2, replace=False)
+    origin, destination = rng.choice(local_candidates, size=2, replace=False)
     attempts += 1
     if (origin, destination) in route_keys:
         continue
@@ -268,9 +277,10 @@ def choose_edge_for_node_wtm(
             cumulative_wait[i] = np.sum(wait_times)
 
     # Normalize metrics for selection consistent with timing logic.
-    # We remove CYCLE_TIME from wait_pressure because wait_times is in cycles (steps).
     queue_pressure = queue_counts[incoming] / np.maximum(1.0, edge_caps[incoming])
-    wait_pressure = cumulative_wait / np.maximum(1.0, edge_caps[incoming])
+    # Average wait per waiting vehicle, scaled against a max tolerable wait (e.g. 5 steps / cycles)
+    avg_waits = cumulative_wait / np.maximum(1.0, queue_counts[incoming])
+    wait_pressure = avg_waits / 5.0
     source_importance = node_importance[edge_source_idx[incoming]]
 
     # MULTIPLICATIVE HUB AWARENESS: Hub status acts as a multiplier to traffic signals.
@@ -356,8 +366,10 @@ def run_simulation_with_waiting_time(
                     # Calculate Queue Pressure (Alpha term)
                     queue_pressure = queue_counts[selected_idx] / max(1.0, edge_cap)
 
-                    # Calculate Wait Pressure (Beta term). Corrected scaling (removed CYCLE_TIME)
-                    wait_pressure = wait_time_sum / max(1.0, edge_cap)
+                    # Calculate Wait Pressure (Beta term).
+                    # Average wait per vehicle scaled against max tolerable wait threshold (5 steps)
+                    avg_wait = wait_time_sum / max(1.0, float(queue_counts[selected_idx]))
+                    wait_pressure = avg_wait / 5.0
 
                     # Calculate Structural Importance (Gamma term)
                     source_node_idx = edge_source_idx[selected_idx]
@@ -667,7 +679,7 @@ if __name__ == "__main__":
     plt.savefig("plot_4.png", dpi=200)
 
     # Performance vs Demand analysis
-    demand_levels = {"Low": 8, "Medium": 18, "High": 30}
+    demand_levels = {"Low": 50, "Medium": 150, "High": 300}
     demand_results = {c: {"travel_time": [], "throughput": []} for c in controllers_list}
     for lbl, rate in demand_levels.items():
         for ctrl in controllers_list:
