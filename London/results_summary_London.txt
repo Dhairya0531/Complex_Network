@@ -6,8 +6,8 @@ LIVE-DYNAMIC TIMING ALLOCATION IMPLEMENTATION
 
 WAITING TIME COMPARISON:
                  Controller  Avg Queue  Avg Travel Time (s)  Avg Wait Time (s)  Max Wait Time (s)  Total Wait (s)  Throughput
-PROPOSED (Live-Dynamic WTM)    8410.61              2638.89            2790.14            67620.0       5898360.0        2114
-               BACKPRESSURE    8877.30              3214.43            3491.11            62340.0       2810340.0         805
+PROPOSED (Live-Dynamic WTM)    8411.04              2658.06            2819.49            64020.0       5994240.0        2126
+               BACKPRESSURE    8876.78              3199.05            3434.40            63180.0       2747520.0         800
                       FIXED    9112.64              3830.65            5052.90            67980.0        939840.0         186
 ============================================================
 

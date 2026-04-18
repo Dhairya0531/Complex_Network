@@ -22,8 +22,8 @@ def create_final_grid():
     w, h = sample_img.size
     
     # Margin for Row Labels (Left) and Column Labels (Top)
-    left_margin = 450
-    top_margin = 150
+    left_margin = 1500
+    top_margin = 600
     
     grid = Image.new('RGB', (w * cols + left_margin, h * rows + top_margin), 'white')
     draw = ImageDraw.Draw(grid)
@@ -31,8 +31,8 @@ def create_final_grid():
     # Font setup
     try:
         # Standard location for fonts on macOS
-        font_large = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 90)
-        font_med = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 70)
+        font_large = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 300)
+        font_med = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 220)
     except:
         font_large = ImageFont.load_default()
         font_med = ImageFont.load_default()

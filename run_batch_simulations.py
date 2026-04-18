@@ -5,18 +5,10 @@ import shutil
 
 # List of cities to simulate (mapping to folder names)
 CITIES = [
-    "Nancy, France",
-    "Strasbourg, France",
-    "Delhi, India",
-    "Chandigarh, India",
     "Bengaluru, India",
     "Berlin, Germany",
     "Sydney, Australia",
-    "London, United Kingdom",
-    "Mumbai City District, India",
-    "Pune, Maharashtra, India",
-    "Hyderabad, Telangana, India",
-    "Noida, Uttar Pradesh, India"
+    "London, United Kingdom"
 ]
 
 def run_simulation(city):

@@ -115,11 +115,12 @@ Li et al. \cite{li2018delay} & Delay-based Queue Reactive & Isolated intersectio
 \hline
 Zhang et al. \cite{zhang2021trafficgcn} & Coordinated RL / Graph Neural Networks & Global (utilizes GNNs / node spatial features) & Predictive and adaptive congestion management & High computational overhead; black-box decision making difficult to interpret. \\
 \hline
+\textbf{Proposed Method} & Topology-Aware Wait-Time Multiplier (WTM) & Global (Betweenness Centrality scoring) & Minimize cumulative wait times and avoid starvation & Resolves the ``dead green'' and starvation issues while maintaining low computational overhead. \\
+\hline
 \end{tabularx}
 \end{table*}
 
 In contrast to the above approaches, the method proposed in this work combines queue-reactive scheduling with global topological awareness through normalized betweenness centrality, using a multiplicative hub-awareness formulation that prevents both congestion cascading and minor-road starvation. Unlike GNN-based methods, it requires no training data and remains fully interpretable.
-\end{table*}
 
 \section{Model Formulation and Methodology}
 \label{section_methodology}

@@ -119,20 +119,33 @@ def run_multi_city_comparison():
     
     # Plotting
     plt.rcParams.update({
-        'font.size': 14,
-        'axes.titlesize': 18,
-        'axes.labelsize': 16,
-        'xtick.labelsize': 14,
-        'ytick.labelsize': 14,
-        'legend.fontsize': 14
+        'font.size': 45,
+        'axes.titlesize': 50,
+        'axes.labelsize': 48,
+        'xtick.labelsize': 42,
+        'ytick.labelsize': 42,
+        'legend.fontsize': 38
     })
-    pivot_df.plot(kind='bar', figsize=(12, 7), edgecolor='black', linewidth=1.5, 
-                  color=['#2e86de', '#95a5a6', '#f1c40f', '#e74c3c'])
+    
+    # Define colors and hatches
+    colors = ['#2e86de', '#95a5a6', '#f1c40f', '#e74c3c']
+    hatches = ['/', '\\\\', 'x', '*']
+    
+    ax = pivot_df.plot(kind='bar', figsize=(20, 12), edgecolor='black', linewidth=1.5, color=colors)
+    
+    # Apply hatches to bars
+    bars = ax.patches
+    num_cities = len(pivot_df)
+    num_measures = len(pivot_df.columns)
+    for i, bar in enumerate(bars):
+        measure_idx = i // num_cities
+        bar.set_hatch(hatches[measure_idx])
+    
     plt.ylabel("Average Travel Time (seconds)")
     plt.title("Centrality Measure Impact Across Different Topologies")
     plt.xticks(rotation=0)
     plt.grid(axis='y', linestyle=':', alpha=0.7)
-    plt.legend(title="Centrality Type")
+    plt.legend(title="Centrality Type", loc='lower center', bbox_to_anchor=(0.5, 0.05), ncol=2)
     plt.tight_layout()
     plt.savefig("multi_city_centrality_comparison.png", dpi=300)
     print("\nComparison plot saved as 'multi_city_centrality_comparison.png'")

@@ -25,7 +25,7 @@ MIN_GREEN = 15
 MAX_GREEN = 45
 ARRIVAL_RATE = 200
 NUM_OD_PAIRS = 20
-NUM_TRIALS = 20
+NUM_TRIALS = 2
 BETWEENNESS_K = 80
 
 rng = np.random.default_rng(RANDOM_SEED)
@@ -564,14 +564,15 @@ if __name__ == "__main__":
 
     plt.rcParams.update(
         {
-            "font.size": 12,
-            "axes.titlesize": 14,
-            "axes.labelsize": 12,
-            "xtick.labelsize": 11,
-            "ytick.labelsize": 11,
+            "font.size": 45,
+            "axes.titlesize": 50,
+            "axes.labelsize": 48,
+            "xtick.labelsize": 42,
+            "ytick.labelsize": 42,
+            "legend.fontsize": 38,
         }
     )
-    plt.rcParams["hatch.linewidth"] = 2.0
+    plt.rcParams["hatch.linewidth"] = 3.0
     bar_width = 0.55
     labels = [controller_labels[c] for c in controllers_list]
     labels_short = ["Fixed", "BP", "Proposed"]
@@ -588,11 +589,11 @@ if __name__ == "__main__":
                 ha="center",
                 va="bottom",
                 fontweight="bold",
-                fontsize=12,
+                fontsize=24,
             )
 
     # Plot 1: Avg Queue Length
-    fig1, ax1 = plt.subplots(figsize=(6, 5))
+    fig1, ax1 = plt.subplots(figsize=(12, 10))
     values = [mean_metrics[c]["avg_queue"] for c in controllers_list]
     bars = ax1.bar(
         labels_short,
@@ -607,13 +608,14 @@ if __name__ == "__main__":
     ax1.set_ylabel("Avg Queue (vehicles)")
     clean_vals = [v for v in values if v is not None and not np.isnan(v)]
     if clean_vals:
-        ax1.set_ylim(0, max(clean_vals) * 1.3)
+        ax1.set_ylim(0, max(clean_vals) * 1.4)
     ax1.grid(axis="y", alpha=0.3, linestyle="--")
+    ax1.legend(bars, labels_short, loc='upper left')
     plt.tight_layout()
     plt.savefig("plot_1.png", dpi=200)
 
     # Plot 2: Avg Travel Time
-    fig2, ax2 = plt.subplots(figsize=(6, 5))
+    fig2, ax2 = plt.subplots(figsize=(12, 10))
     values = [mean_metrics[c]["avg_travel_time"] for c in controllers_list]
     bars = ax2.bar(
         labels_short,
@@ -628,13 +630,14 @@ if __name__ == "__main__":
     ax2.set_ylabel("Avg Travel Time (s)")
     clean_vals = [v for v in values if v is not None and not np.isnan(v)]
     if clean_vals:
-        ax2.set_ylim(0, max(clean_vals) * 1.3)
+        ax2.set_ylim(0, max(clean_vals) * 1.4)
     ax2.grid(axis="y", alpha=0.3, linestyle="--")
+    ax2.legend(bars, labels_short, loc='upper left')
     plt.tight_layout()
     plt.savefig("plot_2.png", dpi=200)
 
     # Plot 3: Throughput
-    fig3, ax3 = plt.subplots(figsize=(6, 5))
+    fig3, ax3 = plt.subplots(figsize=(12, 10))
     values = [mean_metrics[c]["throughput"] for c in controllers_list]
     bars = ax3.bar(
         labels_short,
@@ -649,13 +652,14 @@ if __name__ == "__main__":
     ax3.set_ylabel("Throughput (vehicles)")
     clean_vals = [v for v in values if v is not None and not np.isnan(v)]
     if clean_vals:
-        ax3.set_ylim(0, max(clean_vals) * 1.3)
+        ax3.set_ylim(0, max(clean_vals) * 1.4)
     ax3.grid(axis="y", alpha=0.3, linestyle="--")
+    ax3.legend(bars, labels_short, loc='upper left')
     plt.tight_layout()
     plt.savefig("plot_3.png", dpi=200)
 
     # Plot 4: Waiting Time Boxplot
-    fig4, ax4 = plt.subplots(figsize=(6, 5))
+    fig4, ax4 = plt.subplots(figsize=(12, 10))
     wait_distributions = [
         [r["avg_wait_time"] for r in per_trial_data[c] if not np.isnan(r["avg_wait_time"])]
         for c in controllers_list
@@ -673,8 +677,10 @@ if __name__ == "__main__":
         patch.set_edgecolor(col)
         patch.set_linewidth(2.0)
         patch.set_hatch(h)
+    ax4.set_ylim(bottom=0)
     ax4.set_ylabel("Avg Wait Time (s)")
     ax4.grid(axis="y", alpha=0.3, linestyle="--")
+    ax4.legend(bp["boxes"], labels_short, loc='best')
     plt.tight_layout()
     plt.savefig("plot_4.png", dpi=200)
 
@@ -684,7 +690,7 @@ if __name__ == "__main__":
     for lbl, rate in demand_levels.items():
         for ctrl in controllers_list:
             tt_l, tp_l = [], []
-            for trial in range(5):
+            for trial in range(2):
                 ds = build_demand_schedule(SIMULATION_STEPS, rate, RANDOM_SEED + trial)
                 res = run_simulation_with_waiting_time(G, route_bank, ds, ctrl, topology)
                 tt_l.append(res["avg_travel_time"])
@@ -693,7 +699,7 @@ if __name__ == "__main__":
             demand_results[ctrl]["throughput"].append(np.mean(tp_l))
 
     # Plot 5: Throughput vs Demand
-    fig5, ax5 = plt.subplots(figsize=(6, 5))
+    fig5, ax5 = plt.subplots(figsize=(12, 10))
     x_pos = np.arange(len(demand_levels))
     for ctrl in controllers_list:
         ax5.plot(
@@ -709,12 +715,12 @@ if __name__ == "__main__":
     ax5.set_xticklabels(list(demand_levels.keys()))
     ax5.set_ylabel("Throughput")
     ax5.grid(alpha=0.3, linestyle="--")
-    ax5.legend(fontsize=10)
+    ax5.legend(loc='upper left')
     plt.tight_layout()
     plt.savefig("plot_5.png", dpi=200)
 
     # Plot 6: Travel Time vs Demand
-    fig6, ax6 = plt.subplots(figsize=(6, 5))
+    fig6, ax6 = plt.subplots(figsize=(12, 10))
     for ctrl in controllers_list:
         ax6.plot(
             x_pos,
@@ -729,19 +735,21 @@ if __name__ == "__main__":
     ax6.set_xticklabels(list(demand_levels.keys()))
     ax6.set_ylabel("Avg Travel Time (s)")
     ax6.grid(alpha=0.3, linestyle="--")
-    ax6.legend(fontsize=10)
+    ax6.legend(loc='upper left')
     plt.tight_layout()
     plt.savefig("plot_6.png", dpi=200)
 
     # Plot 7: BC Distribution
-    fig7, ax7 = plt.subplots(figsize=(6, 5))
+    fig7, ax7 = plt.subplots(figsize=(12, 10))
     ax7.hist(
         list(betweenness.values()),
         bins=20,
         color="#2c3e50",
         edgecolor="black",
         alpha=0.7,
+        label="Centrality"
     )
+    ax7.legend(loc='upper right')
     ax7.set_ylabel("Frequency")
     ax7.set_xlabel("Betweenness Centrality")
     ax7.grid(axis="y", alpha=0.3, linestyle="--")
@@ -749,7 +757,7 @@ if __name__ == "__main__":
     plt.savefig("plot_7.png", dpi=200)
 
     # Plot 8: Param Dist
-    fig8, ax8 = plt.subplots(figsize=(6, 5))
+    fig8, ax8 = plt.subplots(figsize=(12, 10))
     params = [
         topology["alpha_dynamic"],
         topology["beta_dynamic"],
@@ -765,6 +773,7 @@ if __name__ == "__main__":
         patch.set_alpha(0.8)
     ax8.set_ylabel("Value")
     ax8.grid(axis="y", alpha=0.3, linestyle="--")
+    ax8.legend(bp8["boxes"], ["Alpha", "Beta", "Gamma"], loc='lower right')
     plt.tight_layout()
     plt.savefig("plot_8.png", dpi=200)
 

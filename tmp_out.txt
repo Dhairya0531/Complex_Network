@@ -1,0 +1,260 @@
+Note: This terminal execution was moved to the background using the ID 637b623f-ee20-4c92-a6eb-5379941bea22
+Note: Command timed out after 60000ms. The command may still be running in terminal ID 637b623f-ee20-4c92-a6eb-5379941bea22. You will be automatically notified on your next turn when it completes. Use get_terminal_output to check output before then, send_to_terminal to send further input, or kill_terminal to stop it. Do NOT use sleep or manual polling to wait. Evaluate the terminal output to determine if the command is waiting for input (e.g. a password prompt, confirmation, or interactive question). A normal shell prompt does NOT count as waiting for input. If it IS waiting for input, you MUST call the vscode_askQuestions tool to ask the user what values to provide. If you are certain about the exact sequence of upcoming prompts for this command (e.g. well-known interactive commands like npm init), include all of them in a single askQuestions call. Otherwise, ask only about the currently visible prompt. Do NOT respond with a text message asking the user — use the tool. Then send each answer one at a time using send_to_terminal with id "637b623f-ee20-4c92-a6eb-5379941bea22", calling get_terminal_output between each to read the next prompt before sending the next answer.
+
+❯ 
+❯  ls -l Bengaluru/*.png
+-rw-r--r--@ 1 drumilbhati  staff  122026 Apr  4 15:51 Bengaluru/plot1_avg_queue_length.png
+-rw-r--r--@ 1 drumilbhati  staff  104342 Apr  4 15:51 Bengaluru/plot2_avg_travel_time.png
+-rw-r--r--@ 1 drumilbhati  staff   98497 Apr  4 15:51 Bengaluru/plot3_throughput.png
+-rw-r--r--@ 1 drumilbhati  staff   73678 Apr  4 15:51 Bengaluru/plot4_waiting_time_distribution.png
+-rw-r--r--@ 1 drumilbhati  staff  611279 Apr  4 15:51 Bengaluru/plot5_heatmap_comparison.png
+-rw-r--r--@ 1 drumilbhati  staff  247215 Apr  4 15:55 Bengaluru/plot6_performance_vs_demand.png
+-rw-r--r--@ 1 drumilbhati  staff   95422 Apr  5 07:25 Bengaluru/plot_1.png
+-rw-r--r--@ 1 drumilbhati  staff   87483 Apr  5 07:25 Bengaluru/plot_2.png
+-rw-r--r--@ 1 drumilbhati  staff   79093 Apr  5 07:25 Bengaluru/plot_3.png
+-rw-r--r--@ 1 drumilbhati  staff   41373 Apr  5 07:25 Bengaluru/plot_4.png
+-rw-r--r--@ 1 drumilbhati  staff   49852 Apr  5 07:26 Bengaluru/plot_5.png
+-rw-r--r--@ 1 drumilbhati  staff   83460 Apr  5 07:26 Bengaluru/plot_6.png
+-rw-r--r--@ 1 drumilbhati  staff   47265 Apr  5 07:26 Bengaluru/plot_7.png
+-rw-r--r--@ 1 drumilbhati  staff   40454 Apr  5 07:26 Bengaluru/plot_8.png
+
+❯ >....                                                                         
+        edgecolor="black",
+        alpha=0.7,
+    )''',
+'''    ax7.hist(
+        list(betweenness.values()),
+        bins=20,
+        color="#2c3e50",
+        edgecolor="black",
+        alpha=0.7,
+        label="Centrality"
+    )
+    ax7.legend(loc='upper right')''')
+
+# Plot 8 legend
+content = content.replace(
+'''    ax8.set_ylabel("Value")
+    ax8.grid(axis="y", alpha=0.3, linestyle="--")''',
+'''    ax8.set_ylabel("Value")
+    ax8.grid(axis="y", alpha=0.3, linestyle="--")
+    ax8.legend(bp8["boxes"], ["Alpha", "Beta", "Gamma"], loc='lower right')''')
+
+# Fix fig sizes globally as well so legends fit
+content = content.replace('''figsize=(6, 5)''', '''figsize=(8, 6)''')
+
+with open("main.py", "w") as f:
+    f.write(content)
+EOF
+python3 patch.py
+
+❯  cat run_final_paper_grid.py
+import subprocess
+import os
+import sys
+import shutil
+
+# Selected cities for the paper grid
+CITIES = [
+    "Bengaluru, India",
+    "Berlin, Germany",
+    "London, United Kingdom",
+    "Sydney, Australia"
+]
+
+def run_simulation(city):
+    folder_name = city.split(",")[0].replace(" ", "_")
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+    
+    print(f"\n>>> Starting simulation for: {city}")
+    
+    with open("main.py", "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    
+    new_lines = []
+    for line in lines:
+        if line.startswith('PLACE = '):
+            new_lines.append(f'PLACE = "{city}"\n')
+        else:
+            new_lines.append(line)
+            
+    temp_script = f"temp_main_{folder_name}.py"
+    with open(temp_script, "w", encoding="utf-8") as f:
+        f.writelines(new_lines)
+    
+    try:
+        python_exe = os.path.join(".venv", "bin", "python")
+        if not os.path.exists(python_exe):
+            python_exe = sys.executable
+
+        subprocess.run([python_exe, temp_script], check=True)
+        
+        # Move generated files (plot_1.png to plot_8.png)
+        for i in range(1, 9):
+            filename = f"plot_{i}.png"
+            if os.path.exists(filename):
+                dest_path = os.path.join(folder_name, filename)
+                if os.path.exists(dest_path):
+                    os.remove(dest_path)
+                shutil.move(filename, dest_path)
+        
+        # Move summary
+        summary_file = f"results_summary_{folder_name}.txt"
+        if os.path.exists(summary_file):
+            shutil.move(summary_file, os.path.join(folder_name, summary_file))
+                
+        print(f">>> Completed simulation for: {city}. Results in ./{folder_name}/")
+    except Exception as e:
+        print(f">>> ERROR for {city}: {str(e)}")
+    finally:
+        if os.path.exists(temp_script):
+            os.remove(temp_script)
+
+if __name__ == "__main__":
+    for city in CITIES:
+        run_simulation(city)
+    
+    print("\n>>> All simulations complete. Generating final grid...")
+    python_exe = os.path.join(".venv", "bin", "python")
+    if not os.path.exists(python_exe):
+        python_exe = sys.executable
+    subprocess.run([python_exe, "paper_grid_generator.py"], check=True)
+❯  cat paper_grid_generator.py
+from PIL import Image, ImageDraw, ImageFont
+import os
+
+# Configuration: Metrics (Rows) x Cities (Cols)
+CITIES = ["Bengaluru", "Berlin", "London", "Sydney"]
+METRICS = [
+    "Avg Queue", "Travel Time", "Throughput", "Wait Variance",
+    "Throughput vs Demand", "Travel vs Demand", "Topology (BC)", "Control Params"
+]
+
+def create_final_grid():
+    rows = 8
+    cols = len(CITIES)
+    
+    # Open a sample image to get dimensions
+    sample_path = f"{CITIES[0]}/plot_1.png"
+    if not os.path.exists(sample_path):
+        print(f"Error: {sample_path} not found. Make sure to run the simulations first.")
+        return
+        
+    sample_img = Image.open(sample_path)
+    w, h = sample_img.size
+    
+    # Margin for Row Labels (Left) and Column Labels (Top)
+    left_margin = 450
+    top_margin = 150
+    
+    grid = Image.new('RGB', (w * cols + left_margin, h * rows + top_margin), 'white')
+    draw = ImageDraw.Draw(grid)
+    
+    # Font setup
+    try:
+        # Standard location for fonts on macOS
+        font_large = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 90)
+        font_med = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 70)
+    except:
+        font_large = ImageFont.load_default()
+        font_med = ImageFont.load_default()
+    
+    for c_idx, label in enumerate(CITIES):
+        # Draw Column Title (City Name) - Centered above the column
+        title_x = c_idx * w + left_margin + w // 2
+        draw.text((title_x, top_margin // 2), label, fill='black', font=font_large, anchor="mm")
+        
+        for r_idx in range(rows):
+            # Draw Row Label (Metric Name) - Only for the first column
+            if c_idx == 0:
+                label_y = r_idx * h + top_margin + h // 2
+                draw.text((20, label_y), METRICS[r_idx], fill='black', font=font_med, anchor="lm")
+            
+            # Load and paste plot
+            plot_path = f"{label}/plot_{r_idx+1}.png"
+            if os.path.exists(plot_path):
+                img = Image.open(plot_path)
+                grid.paste(img, (c_idx * w + left_margin, r_idx * h + top_margin))
+            else:
+                print(f"Warning: {plot_path} missing.")
+            
+    grid.save("final_paper_grid_hd.png", dpi=(300, 300))
+    print("Successfully created final_paper_grid_hd.png with visible city names.")
+
+if __name__ == "__main__":
+    create_final_grid()
+❯  sed -i '' 's/90/150/g' paper_grid_generator.py; sed -i '' 's/70/110/g' paper_grid_generator.py; sed -i '' 's/left_margin = 450/left_margin = 850/g' paper_grid_generator.py; sed -i '' 's/top_margin = 150/top_margin = 350/g' paper_grid_generator.py
+❯  cat paper_grid_generator.py
+from PIL import Image, ImageDraw, ImageFont
+import os
+
+# Configuration: Metrics (Rows) x Cities (Cols)
+CITIES = ["Bengaluru", "Berlin", "London", "Sydney"]
+METRICS = [
+    "Avg Queue", "Travel Time", "Throughput", "Wait Variance",
+    "Throughput vs Demand", "Travel vs Demand", "Topology (BC)", "Control Params"
+]
+
+def create_final_grid():
+    rows = 8
+    cols = len(CITIES)
+    
+    # Open a sample image to get dimensions
+    sample_path = f"{CITIES[0]}/plot_1.png"
+    if not os.path.exists(sample_path):
+        print(f"Error: {sample_path} not found. Make sure to run the simulations first.")
+        return
+        
+    sample_img = Image.open(sample_path)
+    w, h = sample_img.size
+    
+    # Margin for Row Labels (Left) and Column Labels (Top)
+    left_margin = 850
+    top_margin = 350
+    
+    grid = Image.new('RGB', (w * cols + left_margin, h * rows + top_margin), 'white')
+    draw = ImageDraw.Draw(grid)
+    
+    # Font setup
+    try:
+        # Standard location for fonts on macOS
+        font_large = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 150)
+        font_med = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 110)
+    except:
+        font_large = ImageFont.load_default()
+        font_med = ImageFont.load_default()
+    
+    for c_idx, label in enumerate(CITIES):
+        # Draw Column Title (City Name) - Centered above the column
+        title_x = c_idx * w + left_margin + w // 2
+        draw.text((title_x, top_margin // 2), label, fill='black', font=font_large, anchor="mm")
+        
+        for r_idx in range(rows):
+            # Draw Row Label (Metric Name) - Only for the first column
+            if c_idx == 0:
+                label_y = r_idx * h + top_margin + h // 2
+                draw.text((20, label_y), METRICS[r_idx], fill='black', font=font_med, anchor="lm")
+            
+            # Load and paste plot
+            plot_path = f"{label}/plot_{r_idx+1}.png"
+            if os.path.exists(plot_path):
+                img = Image.open(plot_path)
+                grid.paste(img, (c_idx * w + left_margin, r_idx * h + top_margin))
+            else:
+                print(f"Warning: {plot_path} missing.")
+            
+    grid.save("final_paper_grid_hd.png", dpi=(300, 300))
+    print("Successfully created final_paper_grid_hd.png with visible city names.")
+
+if __name__ == "__main__":
+    create_final_grid()
+❯  .venv/bin/python run_final_paper_grid.py
+zsh: no such file or directory: .venv/bin/python
+❯  python3 run_final_paper_grid.py
+
+>>> Starting simulation for: Bengaluru, India
+Fetching network for: Bengaluru, India
+Graph downloaded successfully
+Nodes: 154470
+Edges: 391391
