@@ -11,6 +11,17 @@ CITIES = [
     "Sydney, Australia"
 ]
 
+def get_python_executable():
+    candidates = [
+        os.path.join(".venv", "Scripts", "python.exe"),
+        os.path.join(".venv", "bin", "python"),
+        sys.executable,
+    ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return sys.executable
+
 def run_simulation(city):
     folder_name = city.split(",")[0].replace(" ", "_")
     if not os.path.exists(folder_name):
@@ -33,9 +44,7 @@ def run_simulation(city):
         f.writelines(new_lines)
     
     try:
-        python_exe = os.path.join(".venv", "bin", "python")
-        if not os.path.exists(python_exe):
-            python_exe = sys.executable
+        python_exe = get_python_executable()
 
         subprocess.run([python_exe, temp_script], check=True)
         
@@ -65,7 +74,5 @@ if __name__ == "__main__":
         run_simulation(city)
     
     print("\n>>> All simulations complete. Generating final grid...")
-    python_exe = os.path.join(".venv", "bin", "python")
-    if not os.path.exists(python_exe):
-        python_exe = sys.executable
+    python_exe = get_python_executable()
     subprocess.run([python_exe, "paper_grid_generator.py"], check=True)

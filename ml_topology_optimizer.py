@@ -88,18 +88,40 @@ def run_multi_city_validation():
         all_results[label] = {"theta": theta, "history": history}
     
     plt.rcParams.update({
-        'font.size': 26, 'axes.linewidth': 3.0, 'axes.labelpad': 30, 'axes.titlepad': 40,
-        'xtick.major.pad': 20, 'ytick.major.pad': 20
+        'font.size': 12,
+        'axes.linewidth': 1.8,
+        'axes.labelpad': 10,
+        'axes.titlepad': 14,
+        'xtick.major.pad': 6,
+        'ytick.major.pad': 6,
+        'legend.frameon': True,
     })
-    plt.figure(figsize=(20, 12))
-    for label, res in all_results.items():
-        plt.plot([100*(h/res['history'][0]) for h in res['history']], label=label, linewidth=7.0)
-    plt.title("Formula Optimization Convergence", fontweight='bold', fontsize=36)
-    plt.xlabel("Epoch", fontweight='bold', fontsize=32)
-    plt.ylabel("Normalized Travel Time (%)", fontweight='bold', fontsize=32)
-    plt.legend(title="Cities", title_fontsize=28, fontsize=24, frameon=True, framealpha=1.0, borderpad=1)
-    plt.grid(True, linestyle="--", alpha=0.5); plt.tight_layout(pad=4.0)
-    plt.savefig("ml_optimization_convergence.png", dpi=300)
+    fig, ax = plt.subplots(figsize=(14, 8), constrained_layout=True)
+    linestyles = ['-', '--', '-.', ':']
+    for i, (label, res) in enumerate(all_results.items()):
+        ax.plot(
+            [100 * (h / res["history"][0]) for h in res["history"]],
+            label=label,
+            linewidth=3.2,
+            color='#262626',
+            linestyle=linestyles[i % len(linestyles)],
+            marker='o',
+        )
+    ax.set_title("Formula Optimization Convergence", fontweight="bold", fontsize=20)
+    ax.set_xlabel("Epoch", fontweight="bold", fontsize=15)
+    ax.set_ylabel("Normalized Travel Time (%)", fontweight="bold", fontsize=15)
+    ax.tick_params(axis="both", labelsize=11)
+    ax.grid(True, linestyle="--", alpha=0.35)
+    ax.legend(
+        title="Cities",
+        title_fontsize=14,
+        fontsize=12,
+        loc="upper left",
+        bbox_to_anchor=(1.02, 1.0),
+        borderaxespad=0.0,
+        framealpha=0.95,
+    )
+    fig.savefig("ml_optimization_convergence.png", dpi=300, bbox_inches="tight", pad_inches=0.25)
     print("Success: ml_optimization_convergence.png")
 
 if __name__ == "__main__":

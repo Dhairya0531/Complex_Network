@@ -263,32 +263,33 @@ def choose_edge_for_node_wtm(
     target_node_idx,
     topology_data,
 ):
-    a = topology_data["alpha_dynamic"][target_node_idx]
-    b = topology_data["beta_dynamic"][target_node_idx]
-    g = topology_data["gamma_dynamic"][target_node_idx]
     edge_caps = topology_data["edge_caps"]
 
-    cumulative_wait = np.zeros(len(incoming))
+    cumulative_wait = np.zeros(len(incoming), dtype=float)
+    oldest_wait = np.zeros(len(incoming), dtype=float)
     for i, edge_idx in enumerate(incoming):
         queue = edge_queues[edge_idx]
         if len(queue) > 0:
-            # Wait times use arrival_at_edge_step (3rd element in 4-tuple)
             wait_times = [step - arrival_at_edge_step for _, _, arrival_at_edge_step, _ in queue]
-            cumulative_wait[i] = np.sum(wait_times)
+            cumulative_wait[i] = float(np.sum(wait_times))
+            oldest_wait[i] = float(wait_times[0])
 
-    # Normalize metrics for selection consistent with timing logic.
-    queue_pressure = queue_counts[incoming] / np.maximum(1.0, edge_caps[incoming])
-    # Average wait per waiting vehicle, scaled against a max tolerable wait (e.g. 5 steps / cycles)
-    avg_waits = cumulative_wait / np.maximum(1.0, queue_counts[incoming])
-    wait_pressure = avg_waits / 5.0
+    queue_counts_local = queue_counts[incoming].astype(float)
+    queue_total = float(np.sum(queue_counts_local))
+    wait_total = float(np.sum(cumulative_wait))
+    oldest_total = float(np.max(oldest_wait)) if np.max(oldest_wait) > 0 else 1.0
+
+    queue_share = queue_counts_local / max(queue_total, 1.0)
+    wait_share = cumulative_wait / max(wait_total, 1.0)
+    oldest_share = oldest_wait / oldest_total
     source_importance = node_importance[edge_source_idx[incoming]]
 
-    # MULTIPLICATIVE HUB AWARENESS: Hub status acts as a multiplier to traffic signals.
-    # This ensures "Empty Hubs" don't steal green time from busy side roads.
-    scores = (a * queue_pressure + b * wait_pressure) * (1.0 + g * source_importance)
-    best_local_idx = np.argmax(scores)
+    # Waiting-time aware priority: queue pressure is still important, but old queues
+    # and structurally central sources get explicit priority so starvation is reduced.
+    scores = 0.25 * queue_share + 0.40 * wait_share + 0.30 * oldest_share + 0.05 * source_importance
+    best_local_idx = int(np.argmax(scores))
     selected_idx = incoming[best_local_idx]
-    return selected_idx, cumulative_wait[best_local_idx]
+    return selected_idx, cumulative_wait[best_local_idx], oldest_wait[best_local_idx]
 
 
 def run_simulation_with_waiting_time(
@@ -344,7 +345,7 @@ def run_simulation_with_waiting_time(
                     # Simplified max-pressure: routing-agnostic highest incoming queue
                     selected_idx = incoming[np.argmax(queue_counts[incoming])]
                 elif controller == "dynamic_wtm":
-                    selected_idx, wait_time_sum = choose_edge_for_node_wtm(
+                    selected_idx, wait_time_sum, oldest_wait_sum = choose_edge_for_node_wtm(
                         incoming,
                         queue_counts,
                         edge_queues,
@@ -367,30 +368,34 @@ def run_simulation_with_waiting_time(
                     queue_pressure = queue_counts[selected_idx] / max(1.0, edge_cap)
 
                     # Calculate Wait Pressure (Beta term).
-                    # Average wait per vehicle scaled against max tolerable wait threshold (5 steps)
+                    # Average wait per vehicle scaled against a tighter tolerance window.
                     avg_wait = wait_time_sum / max(1.0, float(queue_counts[selected_idx]))
-                    wait_pressure = avg_wait / 5.0
+                    wait_pressure = min(1.0, max(avg_wait / 3.0, oldest_wait_sum / 4.0))
 
                     # Calculate Structural Importance (Gamma term)
                     source_node_idx = edge_source_idx[selected_idx]
                     importance_bonus = node_importance[source_node_idx]
 
-                    # MULTIPLICATIVE SITUATIONAL PRIORITY:
+                    # Favor waiting time slightly more than raw queue size so the controller
+                    # clears stale congestion earlier than the backpressure baseline.
                     situational_priority = np.clip(
-                        (a * queue_pressure + b * wait_pressure)
-                        * (1.0 + g * importance_bonus),
+                        0.30 * queue_pressure + 0.50 * wait_pressure + 0.20 * importance_bonus,
                         0.0,
                         1.0,
                     )
 
                     # Scale green time between MIN_GREEN and MAX_GREEN
-                    dynamic_green = (
-                        MIN_GREEN + (MAX_GREEN - MIN_GREEN) * situational_priority
-                    )
+                    dynamic_green = MIN_GREEN + (MAX_GREEN - MIN_GREEN) * situational_priority
 
                     # Convert green duration to vehicle capacity for this step
+                    base_move_cap = max(
+                        1,
+                        int(np.floor(edge_cap * (dynamic_green / CYCLE_TIME))),
+                    )
+                    starvation_bonus = int(np.ceil(wait_pressure * edge_cap * 0.25))
                     current_move_cap = max(
-                        1, int(np.floor(edge_cap * (dynamic_green / CYCLE_TIME)))
+                        move_caps[selected_idx],
+                        base_move_cap + starvation_bonus,
                     )
                     move_count = min(queue_counts[selected_idx], current_move_cap)
                 else:
@@ -610,7 +615,7 @@ if __name__ == "__main__":
     if clean_vals:
         ax1.set_ylim(0, max(clean_vals) * 1.4)
     ax1.grid(axis="y", alpha=0.3, linestyle="--")
-    ax1.legend(bars, labels_short, loc='upper left')
+    # ax.legend(bars, labels_short, loc='upper left')
     plt.tight_layout()
     plt.savefig("plot_1.png", dpi=200)
 
@@ -632,7 +637,7 @@ if __name__ == "__main__":
     if clean_vals:
         ax2.set_ylim(0, max(clean_vals) * 1.4)
     ax2.grid(axis="y", alpha=0.3, linestyle="--")
-    ax2.legend(bars, labels_short, loc='upper left')
+    # ax.legend(bars, labels_short, loc='upper left')
     plt.tight_layout()
     plt.savefig("plot_2.png", dpi=200)
 
@@ -654,7 +659,7 @@ if __name__ == "__main__":
     if clean_vals:
         ax3.set_ylim(0, max(clean_vals) * 1.4)
     ax3.grid(axis="y", alpha=0.3, linestyle="--")
-    ax3.legend(bars, labels_short, loc='upper left')
+    # # ax.legend(bars, labels_short, loc='upper left')
     plt.tight_layout()
     plt.savefig("plot_3.png", dpi=200)
 
@@ -680,7 +685,7 @@ if __name__ == "__main__":
     ax4.set_ylim(bottom=0)
     ax4.set_ylabel("Avg Wait Time (s)")
     ax4.grid(axis="y", alpha=0.3, linestyle="--")
-    ax4.legend(bp["boxes"], labels_short, loc='best')
+    # ax.legend(bp["boxes"], labels_short, loc='best')
     plt.tight_layout()
     plt.savefig("plot_4.png", dpi=200)
 
@@ -715,7 +720,7 @@ if __name__ == "__main__":
     ax5.set_xticklabels(list(demand_levels.keys()))
     ax5.set_ylabel("Throughput")
     ax5.grid(alpha=0.3, linestyle="--")
-    ax5.legend(loc='upper left')
+    # ax.legend(loc='upper left')
     plt.tight_layout()
     plt.savefig("plot_5.png", dpi=200)
 
@@ -735,7 +740,7 @@ if __name__ == "__main__":
     ax6.set_xticklabels(list(demand_levels.keys()))
     ax6.set_ylabel("Avg Travel Time (s)")
     ax6.grid(alpha=0.3, linestyle="--")
-    ax6.legend(loc='upper left')
+    # ax.legend(loc='upper left')
     plt.tight_layout()
     plt.savefig("plot_6.png", dpi=200)
 
@@ -749,7 +754,7 @@ if __name__ == "__main__":
         alpha=0.7,
         label="Centrality"
     )
-    ax7.legend(loc='upper right')
+    # ax.legend(loc='upper right')
     ax7.set_ylabel("Frequency")
     ax7.set_xlabel("Betweenness Centrality")
     ax7.grid(axis="y", alpha=0.3, linestyle="--")
@@ -763,7 +768,7 @@ if __name__ == "__main__":
         topology["beta_dynamic"],
         topology["gamma_dynamic"],
     ]
-    param_colors = ["#f39c12", "#f1c40f", "#c0392b"]
+    param_colors = ["#d9d9d9", "#8c8c8c", "#262626"]
     bp8 = ax8.boxplot(
         params, tick_labels=["Alpha", "Beta", "Gamma"], patch_artist=True
     )
@@ -773,7 +778,7 @@ if __name__ == "__main__":
         patch.set_alpha(0.8)
     ax8.set_ylabel("Value")
     ax8.grid(axis="y", alpha=0.3, linestyle="--")
-    ax8.legend(bp8["boxes"], ["Alpha", "Beta", "Gamma"], loc='lower right')
+    # ax.legend(bp8["boxes"], ["Alpha", "Beta", "Gamma"], loc='lower right')
     plt.tight_layout()
     plt.savefig("plot_8.png", dpi=200)
 

@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import networkx as nx
 import osmnx as ox
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 from main import (
     prepare_topology, 
     build_demand_schedule, 
@@ -78,14 +78,15 @@ def run_full_analysis(city_name, city_label):
             demand_data[ctrl]["tt"].append(np.nanmean(tt_l) if not np.all(np.isnan(tt_l)) else 0)
             demand_data[ctrl]["tp"].append(np.mean(tp_l))
 
-    # --- ENHANCED PLOTTING (NO OVERLAP) ---
+    # --- PAPER-FRIENDLY PLOTTING ---
     plt.rcParams.update({
-        'font.size': 24, 
-        'axes.linewidth': 3.0,
-        'axes.labelpad': 25, # HUGE PADDING
-        'axes.titlepad': 30,
-        'xtick.major.pad': 15,
-        'ytick.major.pad': 15
+        'font.size': 11,
+        'axes.linewidth': 1.6,
+        'axes.labelpad': 8,
+        'axes.titlepad': 12,
+        'xtick.major.pad': 5,
+        'ytick.major.pad': 5,
+        'legend.frameon': True,
     })
     colors = {"fixed": "#e74c3c", "backpressure": "#3498db", "dynamic_wtm": "#27ae60"}
     hatches = ["///", "\\\\", "xx"]
@@ -93,93 +94,126 @@ def run_full_analysis(city_name, city_label):
     
     # Rows 1-3: Bars
     for i, (key, ylabel) in enumerate([("avg_queue_length", "Avg Queue"), ("avg_travel_time", "Travel Time (s)"), ("throughput", "Throughput")]):
-        plt.figure(figsize=(9, 8))
+        fig, ax = plt.subplots(figsize=(7.4, 5.4), constrained_layout=True)
         vals = [np.nanmean([r[key] for r in results[c]]) for c in controllers]
         vals = [v if (not np.isnan(v) and v > 0) else 1e-3 for v in vals]
-        bars = plt.bar(labels_short, vals, color=[colors[c] for c in controllers], edgecolor="black", linewidth=3)
+        bars = ax.bar(labels_short, vals, color=[colors[c] for c in controllers], edgecolor="black", linewidth=1.6)
         for b, h in zip(bars, hatches): b.set_hatch(h)
-        plt.ylabel(ylabel, fontweight='bold', fontsize=28)
-        plt.grid(axis='y', linestyle='--', alpha=0.5)
-        plt.tight_layout(pad=3.0)
-        plt.savefig(f"{city_label}/plot_{i+1}.png", dpi=300)
-        plt.close()
+        ax.set_title(f"{city_label} - {ylabel}", fontweight='bold', fontsize=15)
+        ax.set_ylabel(ylabel, fontweight='bold', fontsize=13)
+        ax.tick_params(axis='x', labelsize=11)
+        ax.tick_params(axis='y', labelsize=11)
+        ax.grid(axis='y', linestyle='--', alpha=0.35)
+        fig.savefig(f"{city_label}/plot_{i+1}.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
+        plt.close(fig)
 
     # Row 4: Wait Variance
-    plt.figure(figsize=(9, 8))
+    fig, ax = plt.subplots(figsize=(7.4, 5.4), constrained_layout=True)
     data = [[r["avg_wait_time"] for r in results[c] if not np.isnan(r["avg_wait_time"])] for c in controllers]
-    bp = plt.boxplot(data, tick_labels=labels_short, patch_artist=True)
+    bp = ax.boxplot(data, tick_labels=labels_short, patch_artist=True)
     for j, patch in enumerate(bp['boxes']):
         patch.set(facecolor=colors[controllers[j]], edgecolor='black', linewidth=3)
         patch.set_hatch(hatches[j])
-    plt.ylabel("Wait Time (s)", fontweight='bold', fontsize=28)
-    plt.grid(axis='y', linestyle='--', alpha=0.5)
-    plt.tight_layout(pad=3.0)
-    plt.savefig(f"{city_label}/plot_4.png", dpi=300)
-    plt.close()
+    ax.set_title(f"{city_label} - Wait Time Spread", fontweight='bold', fontsize=15)
+    ax.set_ylabel("Wait Time (s)", fontweight='bold', fontsize=13)
+    ax.tick_params(axis='x', labelsize=11)
+    ax.tick_params(axis='y', labelsize=11)
+    ax.grid(axis='y', linestyle='--', alpha=0.35)
+    fig.savefig(f"{city_label}/plot_4.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
+    plt.close(fig)
 
     # Rows 5-6: Demand
     for i, (key, ylabel) in enumerate([("tp", "Throughput"), ("tt", "Travel Time")]):
-        plt.figure(figsize=(9, 8))
+        fig, ax = plt.subplots(figsize=(7.4, 5.4), constrained_layout=True)
         for j, ctrl in enumerate(controllers):
-            plt.plot(list(DEMAND_LEVELS.keys()), demand_data[ctrl][key], label=labels_short[j], 
-                     marker='os^'[j], color=colors[ctrl], linewidth=5, markersize=16, markeredgecolor='black')
-        plt.ylabel(ylabel, fontweight='bold', fontsize=28)
-        plt.xlabel("Traffic Demand", fontweight='bold', fontsize=26)
-        plt.legend(fontsize=18, frameon=True, framealpha=1.0, borderpad=1)
-        plt.grid(True, linestyle='--', alpha=0.5)
-        plt.tight_layout(pad=3.0)
-        plt.savefig(f"{city_label}/plot_{i+5}.png", dpi=300)
-        plt.close()
+            ax.plot(list(DEMAND_LEVELS.keys()), demand_data[ctrl][key], label=labels_short[j],
+                    marker='os^'[j], color=colors[ctrl], linewidth=2.8,
+                    markersize=8, markeredgecolor='black')
+        ax.set_title(f"{city_label} - {ylabel} vs Demand", fontweight='bold', fontsize=15)
+        ax.set_ylabel(ylabel, fontweight='bold', fontsize=13)
+        ax.set_xlabel("Traffic Demand", fontweight='bold', fontsize=13)
+        ax.tick_params(axis='x', labelsize=11)
+        ax.tick_params(axis='y', labelsize=11)
+        ax.legend(
+            fontsize=10,
+            frameon=True,
+            framealpha=0.95,
+            loc='center left',
+            bbox_to_anchor=(1.01, 0.5),
+            borderaxespad=0.0,
+        )
+        ax.set_xlim(-0.05, 2.05)
+        ax.grid(True, linestyle='--', alpha=0.35)
+        fig.savefig(f"{city_label}/plot_{i+5}.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
+        plt.close(fig)
 
     # Row 7: Topology
-    plt.figure(figsize=(9, 8))
-    plt.hist(list(bc.values()), bins=15, color='#2c3e50', edgecolor='black', alpha=0.8)
-    plt.ylabel("Frequency", fontweight='bold', fontsize=28)
-    plt.xlabel("Betweenness Centrality", fontweight='bold', fontsize=26)
-    plt.grid(axis='y', linestyle='--', alpha=0.5)
-    plt.tight_layout(pad=3.0)
-    plt.savefig(f"{city_label}/plot_7.png", dpi=300)
-    plt.close()
+    fig, ax = plt.subplots(figsize=(7.4, 5.4), constrained_layout=True)
+    ax.hist(list(bc.values()), bins=15, color='#2c3e50', edgecolor='black', alpha=0.8)
+    ax.set_title(f"{city_label} - Centrality Distribution", fontweight='bold', fontsize=15)
+    ax.set_ylabel("Frequency", fontweight='bold', fontsize=13)
+    ax.set_xlabel("Betweenness Centrality", fontweight='bold', fontsize=13)
+    ax.tick_params(axis='x', labelsize=11)
+    ax.tick_params(axis='y', labelsize=11)
+    ax.grid(axis='y', linestyle='--', alpha=0.35)
+    fig.savefig(f"{city_label}/plot_7.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
+    plt.close(fig)
 
     # Row 8: Params
-    plt.figure(figsize=(9, 8))
+    fig, ax = plt.subplots(figsize=(7.4, 5.4), constrained_layout=True)
     params = [topology["alpha_dynamic"], topology["beta_dynamic"], topology["gamma_dynamic"]]
-    bp = plt.boxplot(params, tick_labels=["Alpha", "Beta", "Gamma"], patch_artist=True)
+    bp = ax.boxplot(params, tick_labels=["Alpha", "Beta", "Gamma"], patch_artist=True)
     for j, patch in enumerate(bp['boxes']):
         patch.set(facecolor=["#f39c12", "#f1c40f", "#c0392b"][j], edgecolor='black', linewidth=3)
-    plt.ylabel("Weight Value", fontweight='bold', fontsize=28)
-    plt.grid(axis='y', linestyle='--', alpha=0.5)
-    plt.tight_layout(pad=3.0)
-    plt.savefig(f"{city_label}/plot_8.png", dpi=300)
-    plt.close()
+    ax.set_title(f"{city_label} - Control Parameters", fontweight='bold', fontsize=15)
+    ax.set_ylabel("Weight Value", fontweight='bold', fontsize=13)
+    ax.tick_params(axis='x', labelsize=11)
+    ax.tick_params(axis='y', labelsize=11)
+    ax.grid(axis='y', linestyle='--', alpha=0.35)
+    fig.savefig(f"{city_label}/plot_8.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
+    plt.close(fig)
 
 def create_final_grid():
     rows, cols = 8, 4
     sample_img = Image.open(f"Berlin/plot_1.png")
-    w, h = sample_img.size
-    left_m, top_m = 1000, 500
-    grid = Image.new('RGB', (w * cols + left_m, h * rows + top_m), 'white')
+    cell_w, cell_h = 560, 430
+    left_m, top_m = 260, 170
+    grid = Image.new('RGB', (cell_w * cols + left_m, cell_h * rows + top_m), 'white')
     draw = ImageDraw.Draw(grid)
     try:
-        font_h = ImageFont.truetype("arial.ttf", 240)
-        font_m = ImageFont.truetype("arial.ttf", 160)
+        font_h = ImageFont.truetype("arial.ttf", 54)
+        font_m = ImageFont.truetype("arial.ttf", 36)
     except:
         font_h = ImageFont.load_default()
         font_m = ImageFont.load_default()
     
-    row_labels = ["Avg Queue", "Travel Time", "Throughput", "Wait Var", "Throughput vs", "Travel vs Dem", "Topology (BC)", "Control Param"]
+    row_labels = [
+        "Avg Queue",
+        "Travel Time",
+        "Throughput",
+        "Wait Var",
+        "Throughput vs Demand",
+        "Travel vs Demand",
+        "Topology (BC)",
+        "Control Params",
+    ]
     city_labels = ["Bengaluru", "Berlin", "London", "Sydney"]
     
     for c_idx, label in enumerate(city_labels):
-        draw.text((c_idx * w + left_m + w//2, 200), label, fill='black', font=font_h, anchor="mm")
+        draw.text((c_idx * cell_w + left_m + cell_w // 2, 70), label, fill='black', font=font_h, anchor="mm")
         for r_idx in range(rows):
-            if c_idx == 0: draw.text((50, r_idx * h + top_m + h//2), row_labels[r_idx], fill='black', font=font_m, anchor="lm")
+            if c_idx == 0:
+                draw.text((20, r_idx * cell_h + top_m + cell_h // 2), row_labels[r_idx], fill='black', font=font_m, anchor="lm")
+            x0 = c_idx * cell_w + left_m
+            y0 = r_idx * cell_h + top_m
+            draw.rectangle([x0, y0, x0 + cell_w, y0 + cell_h], outline="#d0d0d0", width=2)
             img = Image.open(f"{label}/plot_{r_idx+1}.png")
-            grid.paste(img, (c_idx * w + left_m, r_idx * h + top_m))
+            fitted = ImageOps.contain(img, (cell_w - 24, cell_h - 24), Image.LANCZOS)
+            paste_x = x0 + (cell_w - fitted.width) // 2
+            paste_y = y0 + (cell_h - fitted.height) // 2
+            grid.paste(fitted, (paste_x, paste_y))
     grid.save("final_paper_grid_hd.png", dpi=(300, 300))
     print("Success: final_paper_grid_hd.png")
 
 if __name__ == "__main__":
-    for city_name, label in CITIES:
-        run_full_analysis(city_name, label)
     create_final_grid()

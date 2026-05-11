@@ -79,24 +79,46 @@ def run_multi_city_comparison():
     df = pd.DataFrame(city_results)
     pivot_df = df.pivot(index='City', columns='Measure', values='Avg Travel Time')
     
-    # --- ULTRA PROFESSIONAL PLOT ---
+    # --- CLEAN PAPER PLOT ---
     plt.rcParams.update({
-        'font.size': 26, 'axes.linewidth': 3.0, 'axes.labelpad': 30, 'axes.titlepad': 40,
-        'xtick.major.pad': 20, 'ytick.major.pad': 20
+        'font.size': 12,
+        'axes.linewidth': 1.8,
+        'axes.labelpad': 10,
+        'axes.titlepad': 14,
+        'xtick.major.pad': 6,
+        'ytick.major.pad': 6,
+        'legend.frameon': True,
     })
-    ax = pivot_df.plot(kind='bar', figsize=(20, 12), edgecolor='black', linewidth=2.5, 
-                       color=['#2e86de', '#95a5a6', '#f1c40f', '#e74c3c'], width=0.8)
+    fig, ax = plt.subplots(figsize=(14, 8), constrained_layout=True)
+    pivot_df.plot(
+        kind='bar',
+        ax=ax,
+        edgecolor='black',
+        linewidth=1.4,
+        color=['#d9d9d9', '#8c8c8c', '#595959', '#262626'],
+        width=0.78,
+    )
     bars, hatches = ax.patches, ['///', '\\\\', 'xx', '..']
-    for i, bar in enumerate(bars): bar.set_hatch(hatches[i // len(pivot_df)])
+    num_measures = len(pivot_df.columns)
+    for i, bar in enumerate(bars):
+        bar.set_hatch(hatches[i // num_measures])
     
-    plt.ylabel("Avg Travel Time (s)", fontweight='bold', fontsize=32)
-    plt.xlabel("City", fontweight='bold', fontsize=32)
-    plt.title("Impact of Centrality Metric on Performance", fontweight='bold', fontsize=36)
-    plt.xticks(rotation=0)
-    plt.grid(axis='y', linestyle='--', alpha=0.5)
-    plt.legend(title="Centrality Type", title_fontsize=28, frameon=True, framealpha=1.0, loc='best', borderpad=1)
-    plt.tight_layout(pad=4.0)
-    plt.savefig("multi_city_centrality_comparison.png", dpi=300)
+    ax.set_ylabel("Avg Travel Time (s)", fontweight='bold', fontsize=15)
+    ax.set_xlabel("City", fontweight='bold', fontsize=15)
+    ax.set_title("Impact of Centrality Metric on Performance", fontweight='bold', fontsize=20)
+    ax.tick_params(axis='x', labelrotation=0, labelsize=12)
+    ax.tick_params(axis='y', labelsize=11)
+    ax.grid(axis='y', linestyle='--', alpha=0.35)
+    ax.legend(
+        title="Centrality Type",
+        title_fontsize=14,
+        fontsize=12,
+        loc='upper left',
+        bbox_to_anchor=(1.02, 1.0),
+        borderaxespad=0.0,
+        framealpha=0.95,
+    )
+    fig.savefig("multi_city_centrality_comparison.png", dpi=300, bbox_inches='tight', pad_inches=0.25)
     print("Success: multi_city_centrality_comparison.png")
 
 if __name__ == "__main__":
