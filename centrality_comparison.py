@@ -11,7 +11,7 @@ from main import (
     parse_numeric
 )
 
-# --- ROBUST CONFIGURATION ---
+# --- CONFIGURATION ---
 CITIES = [
     ("Cubbon Park, Bengaluru, India", "Bengaluru"),
     ("Brandenburg Gate, Berlin, Germany", "Berlin"),
@@ -20,11 +20,9 @@ CITIES = [
 ]
 SIM_STEPS = 600
 ARRIVAL_RATE = 8
-NUM_TRIALS = 1
 
 def get_graph_local(place, label):
     import osmnx as ox
-    print(f"Fetching {label} patch...")
     raw_graph = ox.graph_from_address(place, dist=1200, network_type="drive", simplify=True)
     largest_component = max(nx.strongly_connected_components(raw_graph), key=len)
     raw_graph = raw_graph.subgraph(largest_component).copy()
@@ -47,11 +45,8 @@ def build_demand_local(steps, arrival_rate, seed, num_routes):
     schedule = []
     for _ in range(steps):
         arrivals = int(local_rng.poisson(arrival_rate))
-        if arrivals == 0:
-            schedule.append([])
-            continue
-        chosen_routes = local_rng.integers(0, num_routes, size=arrivals)
-        schedule.append(chosen_routes.tolist())
+        if arrivals == 0: schedule.append([]); continue
+        schedule.append(local_rng.integers(0, num_routes, size=arrivals).tolist())
     return schedule
 
 def run_multi_city_comparison():
@@ -72,12 +67,10 @@ def run_multi_city_comparison():
             o, d = rng.choice(candidate_nodes, 2, replace=False)
             try:
                 path = nx.shortest_path(G, o, d, weight="travel_time")
-                if 3 <= len(path) <= 7:
-                    routes.append({"edges": list(zip(path[:-1], path[1:]))})
+                if 3 <= len(path) <= 7: routes.append({"edges": list(zip(path[:-1], path[1:]))})
             except: continue
         demand = build_demand_local(SIM_STEPS, ARRIVAL_RATE, 42, len(routes))
         for name, centrality_map in measures.items():
-            print(f"  Testing {name}...")
             nx.set_node_attributes(G, centrality_map, "betweenness_norm") 
             topology = prepare_topology(G)
             res = run_simulation_with_waiting_time(G, routes, demand, "dynamic_wtm", topology)
@@ -85,17 +78,24 @@ def run_multi_city_comparison():
 
     df = pd.DataFrame(city_results)
     pivot_df = df.pivot(index='City', columns='Measure', values='Avg Travel Time')
-    plt.rcParams.update({'font.size': 24, 'axes.linewidth': 2.5, 'axes.titlesize': 32, 'axes.labelsize': 28})
-    ax = pivot_df.plot(kind='bar', figsize=(18, 10), edgecolor='black', linewidth=2.0, color=['#2e86de', '#95a5a6', '#f1c40f', '#e74c3c'])
+    
+    # --- ULTRA PROFESSIONAL PLOT ---
+    plt.rcParams.update({
+        'font.size': 26, 'axes.linewidth': 3.0, 'axes.labelpad': 30, 'axes.titlepad': 40,
+        'xtick.major.pad': 20, 'ytick.major.pad': 20
+    })
+    ax = pivot_df.plot(kind='bar', figsize=(20, 12), edgecolor='black', linewidth=2.5, 
+                       color=['#2e86de', '#95a5a6', '#f1c40f', '#e74c3c'], width=0.8)
     bars, hatches = ax.patches, ['///', '\\\\', 'xx', '..']
     for i, bar in enumerate(bars): bar.set_hatch(hatches[i // len(pivot_df)])
-    plt.ylabel("Avg Travel Time (s)", fontweight='bold')
-    plt.xlabel("City", fontweight='bold')
-    plt.title("Impact of Centrality Measure", fontweight='bold')
+    
+    plt.ylabel("Avg Travel Time (s)", fontweight='bold', fontsize=32)
+    plt.xlabel("City", fontweight='bold', fontsize=32)
+    plt.title("Impact of Centrality Metric on Performance", fontweight='bold', fontsize=36)
     plt.xticks(rotation=0)
-    plt.grid(axis='y', linestyle=':', alpha=0.7)
-    plt.legend(title="Centrality Type", title_fontsize=24, frameon=True, framealpha=0.9)
-    plt.tight_layout()
+    plt.grid(axis='y', linestyle='--', alpha=0.5)
+    plt.legend(title="Centrality Type", title_fontsize=28, frameon=True, framealpha=1.0, loc='best', borderpad=1)
+    plt.tight_layout(pad=4.0)
     plt.savefig("multi_city_centrality_comparison.png", dpi=300)
     print("Success: multi_city_centrality_comparison.png")
 
