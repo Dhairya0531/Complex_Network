@@ -90,18 +90,26 @@ def run_multi_city_comparison():
         'legend.frameon': True,
     })
     fig, ax = plt.subplots(figsize=(14, 8), constrained_layout=True)
+    palette = ['#95a5a6', '#3498db', '#27ae60', '#9b59b6']
+    hatches = ['///', '\\\\\\\\', 'xx', '..']
+    plt.rcParams['hatch.linewidth'] = 2.2
     pivot_df.plot(
         kind='bar',
         ax=ax,
         edgecolor='black',
-        linewidth=1.4,
-        color=['#d9d9d9', '#8c8c8c', '#595959', '#262626'],
+        linewidth=1.8,
+        color=palette,
         width=0.78,
     )
-    bars, hatches = ax.patches, ['///', '\\\\', 'xx', '..']
-    num_measures = len(pivot_df.columns)
-    for i, bar in enumerate(bars):
-        bar.set_hatch(hatches[i // num_measures])
+
+    # Keep color for on-screen readability and hatch patterns for grayscale printing.
+    for measure_idx, container in enumerate(ax.containers):
+        edge_color = palette[measure_idx % len(palette)]
+        hatch = hatches[measure_idx % len(hatches)]
+        for bar in container:
+            bar.set_facecolor('white')
+            bar.set_edgecolor(edge_color)
+            bar.set_hatch(hatch)
     
     ax.set_ylabel("Avg Travel Time (s)", fontweight='bold', fontsize=15)
     ax.set_xlabel("City", fontweight='bold', fontsize=15)
