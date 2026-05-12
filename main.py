@@ -64,110 +64,114 @@ def collapse_multidigraph(multigraph):
 
 # --- DATA INGESTION ---
 
-cache_dir = os.path.expanduser("~/.cache/osmnx")
-if os.path.exists(cache_dir):
-    print(f"Clearing OSM cache: {cache_dir}")
-    shutil.rmtree(cache_dir, ignore_errors=True)
+if __name__ == "__main__":
+    cache_dir = os.path.expanduser("~/.cache/osmnx")
+    if os.path.exists(cache_dir):
+        print(f"Clearing OSM cache: {cache_dir}")
+        shutil.rmtree(cache_dir, ignore_errors=True)
 
-try:
-    print(f"Fetching network for: {PLACE}")
-    raw_graph = ox.graph_from_place(PLACE, network_type=NETWORK_TYPE, simplify=True)
-    print("Graph downloaded successfully")
-except Exception as e:
-    print(f"Error fetching graph: {e}")
-    print("Retrying with alternative settings...")
     try:
-        raw_graph = ox.graph_from_place(
-            PLACE, network_type=NETWORK_TYPE, simplify=True, retain_all=True
-        )
-        print("Graph downloaded with retain_all=True")
-    except Exception as e2:
-        print(f"Retry failed: {e2}")
-        raise
+        print(f"Fetching network for: {PLACE}")
+        raw_graph = ox.graph_from_place(PLACE, network_type=NETWORK_TYPE, simplify=True)
+        print("Graph downloaded successfully")
+    except Exception as e:
+        print(f"Error fetching graph: {e}")
+        print("Retrying with alternative settings...")
+        try:
+            raw_graph = ox.graph_from_place(
+                PLACE, network_type=NETWORK_TYPE, simplify=True, retain_all=True
+            )
+            print("Graph downloaded with retain_all=True")
+        except Exception as e2:
+            print(f"Retry failed: {e2}")
+            raise
 
-largest_component = max(nx.strongly_connected_components(raw_graph), key=len)
-raw_graph = raw_graph.subgraph(largest_component).copy()
+    largest_component = max(nx.strongly_connected_components(raw_graph), key=len)
+    raw_graph = raw_graph.subgraph(largest_component).copy()
 
-G = collapse_multidigraph(raw_graph)
-G.graph["crs"] = raw_graph.graph.get("crs")
+    G = collapse_multidigraph(raw_graph)
+    G.graph["crs"] = raw_graph.graph.get("crs")
 
-for u, v, data in G.edges(data=True):
-    length = float(data.get("length", 1.0))
-    speed_kph = parse_numeric(data.get("maxspeed"), 35.0)
-    lanes = max(1, int(round(parse_numeric(data.get("lanes"), 1.0))))
-    travel_time = length / max(speed_kph * 1000 / 3600, 1.0)
+    for u, v, data in G.edges(data=True):
+        length = float(data.get("length", 1.0))
+        speed_kph = parse_numeric(data.get("maxspeed"), 35.0)
+        lanes = max(1, int(round(parse_numeric(data.get("lanes"), 1.0))))
+        travel_time = length / max(speed_kph * 1000 / 3600, 1.0)
 
-    data["length"] = length
-    data["speed_kph"] = speed_kph
-    data["lanes"] = lanes
-    data["travel_time"] = travel_time
-    data["capacity_per_cycle"] = max(1, int(lanes * 8))
+        data["length"] = length
+        data["speed_kph"] = speed_kph
+        data["lanes"] = lanes
+        data["travel_time"] = travel_time
+        data["capacity_per_cycle"] = max(1, int(lanes * 8))
 
-print(f"Nodes: {G.number_of_nodes()}")
-print(f"Edges: {G.number_of_edges()}")
+    print(f"Nodes: {G.number_of_nodes()}")
+    print(f"Edges: {G.number_of_edges()}")
 
-# --- CENTRALITY ANALYSIS ---
+    # --- CENTRALITY ANALYSIS ---
 
-k_value = min(BETWEENNESS_K, max(10, G.number_of_nodes() - 1))
-betweenness = nx.betweenness_centrality(
-    G,
-    k=k_value,
-    normalized=True,
-    weight="travel_time",
-    seed=RANDOM_SEED,
-    endpoints=False,
-)
-
-max_bc = max(betweenness.values()) if betweenness else 1.0
-node_importance = {
-    node: (value / max_bc if max_bc else 0.0) for node, value in betweenness.items()
-}
-nx.set_node_attributes(G, node_importance, "betweenness_norm")
-
-candidate_nodes = [
-    node for node in G.nodes() if G.in_degree(node) > 0 and G.out_degree(node) > 0
-]
-print(f"Candidate intersections: {len(candidate_nodes)}")
-
-# --- TRAFFIC DEMAND ---
-
-# Identify the busiest "downtown" hub using betweenness centrality
-hub_node = max(node_importance, key=node_importance.get)
-# Create a local operational zone (e.g., 30 edge hops from the hub) to force congestion
-local_neighborhood = nx.single_source_shortest_path_length(G, hub_node, cutoff=30)
-local_candidates = [n for n in candidate_nodes if n in local_neighborhood]
-
-if len(local_candidates) < 20: 
-    local_candidates = candidate_nodes # Fallback if graph is tiny
-
-route_bank = []
-route_keys = set()
-attempts = 0
-max_attempts = NUM_OD_PAIRS * 100
-
-while len(route_bank) < NUM_OD_PAIRS and attempts < max_attempts:
-    origin, destination = rng.choice(local_candidates, size=2, replace=False)
-    attempts += 1
-    if (origin, destination) in route_keys:
-        continue
-    try:
-        path = nx.shortest_path(G, origin, destination, weight="travel_time")
-    except nx.NetworkXNoPath:
-        continue
-    if len(path) < 4:
-        continue
-    route_edges = list(zip(path[:-1], path[1:]))
-    route_bank.append(
-        {
-            "origin": origin,
-            "destination": destination,
-            "path": path,
-            "edges": route_edges,
-        }
+    k_value = min(BETWEENNESS_K, max(10, G.number_of_nodes() - 1))
+    betweenness = nx.betweenness_centrality(
+        G,
+        k=k_value,
+        normalized=True,
+        weight="travel_time",
+        seed=RANDOM_SEED,
+        endpoints=False,
     )
-    route_keys.add((origin, destination))
 
-print(f"Routes prepared: {len(route_bank)}")
+    max_bc = max(betweenness.values()) if betweenness else 1.0
+    node_importance = {
+        node: (value / max_bc if max_bc else 0.0) for node, value in betweenness.items()
+    }
+    nx.set_node_attributes(G, node_importance, "betweenness_norm")
+
+    candidate_nodes = [
+        node for node in G.nodes() if G.in_degree(node) > 0 and G.out_degree(node) > 0
+    ]
+    print(f"Candidate intersections: {len(candidate_nodes)}")
+
+    # --- TRAFFIC DEMAND ---
+
+    # Identify the busiest "downtown" hub using betweenness centrality
+    hub_node = max(node_importance, key=node_importance.get)
+    # Create a local operational zone (e.g., 30 edge hops from the hub) to force congestion
+    local_neighborhood = nx.single_source_shortest_path_length(G, hub_node, cutoff=30)
+    local_candidates = [n for n in candidate_nodes if n in local_neighborhood]
+
+    if len(local_candidates) < 20: 
+        local_candidates = candidate_nodes # Fallback if graph is tiny
+
+    route_bank = []
+    route_keys = set()
+    attempts = 0
+    max_attempts = NUM_OD_PAIRS * 100
+
+    while len(route_bank) < NUM_OD_PAIRS and attempts < max_attempts:
+        origin, destination = rng.choice(local_candidates, size=2, replace=False)
+        attempts += 1
+        if (origin, destination) in route_keys:
+            continue
+        try:
+            path = nx.shortest_path(G, origin, destination, weight="travel_time")
+        except nx.NetworkXNoPath:
+            continue
+        if len(path) < 4:
+            continue
+        route_edges = list(zip(path[:-1], path[1:]))
+        route_bank.append(
+            {
+                "origin": origin,
+                "destination": destination,
+                "path": path,
+                "edges": route_edges,
+            }
+        )
+        route_keys.add((origin, destination))
+
+    print(f"Routes prepared: {len(route_bank)}")
+    demand_schedule = build_demand_schedule(SIMULATION_STEPS, ARRIVAL_RATE, RANDOM_SEED)
+    total_arrivals = sum(len(step) for step in demand_schedule)
+    print(f"Vehicles scheduled: {total_arrivals}")
 
 
 def build_demand_schedule(steps, arrival_rate, seed):
@@ -178,14 +182,15 @@ def build_demand_schedule(steps, arrival_rate, seed):
         if arrivals == 0:
             schedule.append([])
             continue
-        chosen_routes = local_rng.integers(0, len(route_bank), size=arrivals)
+        # Use a local check for route_bank if available, else assume it's passed or used elsewhere
+        try:
+            rb_len = len(route_bank)
+        except NameError:
+            rb_len = NUM_OD_PAIRS # Fallback
+            
+        chosen_routes = local_rng.integers(0, rb_len, size=arrivals)
         schedule.append(chosen_routes.tolist())
     return schedule
-
-
-demand_schedule = build_demand_schedule(SIMULATION_STEPS, ARRIVAL_RATE, RANDOM_SEED)
-total_arrivals = sum(len(step) for step in demand_schedule)
-print(f"Vehicles scheduled: {total_arrivals}")
 
 # --- TOPOLOGY PREPARATION ---
 
@@ -376,10 +381,9 @@ def run_simulation_with_waiting_time(
                     source_node_idx = edge_source_idx[selected_idx]
                     importance_bonus = node_importance[source_node_idx]
 
-                    # Favor waiting time slightly more than raw queue size so the controller
-                    # clears stale congestion earlier than the backpressure baseline.
+                    # Use node-specific dynamic weights (learned via optimization)
                     situational_priority = np.clip(
-                        0.30 * queue_pressure + 0.50 * wait_pressure + 0.20 * importance_bonus,
+                        a * queue_pressure + b * wait_pressure + g * importance_bonus,
                         0.0,
                         1.0,
                     )
