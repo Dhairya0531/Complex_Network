@@ -18,8 +18,8 @@ CITIES = [
     ("Trafalgar Square, London, UK", "London"),
     ("Sydney Opera House, Sydney, Australia", "Sydney")
 ]
-SIM_STEPS = 600
-ARRIVAL_RATE = 8
+SIM_STEPS = 100
+ARRIVAL_RATE = 120
 
 def get_graph_local(place, label):
     import osmnx as ox
@@ -69,12 +69,25 @@ def run_multi_city_comparison():
                 path = nx.shortest_path(G, o, d, weight="travel_time")
                 if 3 <= len(path) <= 7: routes.append({"edges": list(zip(path[:-1], path[1:]))})
             except: continue
-        demand = build_demand_local(SIM_STEPS, ARRIVAL_RATE, 42, len(routes))
+        num_trials = 10
         for name, centrality_map in measures.items():
             nx.set_node_attributes(G, centrality_map, "betweenness_norm") 
             topology = prepare_topology(G)
-            res = run_simulation_with_waiting_time(G, routes, demand, "dynamic_wtm", topology)
-            city_results.append({"City": label, "Measure": name, "Avg Travel Time": res['avg_travel_time'] if not np.isnan(res['avg_travel_time']) else 0})
+            
+            travel_times = []
+            for trial in range(num_trials):
+                trial_demand = build_demand_local(SIM_STEPS, ARRIVAL_RATE, 42 + trial, len(routes))
+                res = run_simulation_with_waiting_time(G, routes, trial_demand, "dynamic_wtm", topology)
+                t_time = res['avg_travel_time']
+                if not np.isnan(t_time):
+                    travel_times.append(t_time)
+            
+            avg_t_time = np.mean(travel_times) if travel_times else 0
+            city_results.append({
+                "City": label, 
+                "Measure": name, 
+                "Avg Travel Time": avg_t_time
+            })
 
     df = pd.DataFrame(city_results)
     pivot_df = df.pivot(index='City', columns='Measure', values='Avg Travel Time')
@@ -90,7 +103,7 @@ def run_multi_city_comparison():
         'legend.frameon': True,
     })
     fig, ax = plt.subplots(figsize=(14, 8), constrained_layout=True)
-    palette = ['#95a5a6', '#3498db', '#27ae60', '#9b59b6']
+    palette = ['#27ae60', '#3498db', '#e67e22', '#9b59b6']
     hatches = ['///', '\\\\\\\\', 'xx', '..']
     plt.rcParams['hatch.linewidth'] = 2.2
     pivot_df.plot(
@@ -102,22 +115,37 @@ def run_multi_city_comparison():
         width=0.78,
     )
 
-    # Keep color for on-screen readability and hatch patterns for grayscale printing.
+    # Apply grayscale colors, hatch patterns, and black borders for printing.
     for measure_idx, container in enumerate(ax.containers):
-        edge_color = palette[measure_idx % len(palette)]
+        color = palette[measure_idx % len(palette)]
         hatch = hatches[measure_idx % len(hatches)]
         for bar in container:
-            bar.set_facecolor('white')
-            bar.set_edgecolor(edge_color)
+            bar.set_facecolor(color)
+            bar.set_edgecolor('black')
             bar.set_hatch(hatch)
     
-    ax.set_ylabel("Avg Travel Time (s)", fontweight='bold', fontsize=15)
+    ax.set_ylabel("Avg Travel Time (seconds) [Lower is Better]", fontweight='bold', fontsize=15)
     ax.set_xlabel("City", fontweight='bold', fontsize=15)
     ax.set_title("Impact of Centrality Metric on Performance", fontweight='bold', fontsize=20)
     ax.tick_params(axis='x', labelrotation=0, labelsize=12)
     ax.tick_params(axis='y', labelsize=11)
     ax.grid(axis='y', linestyle='--', alpha=0.35)
+    
+    # Sync legend handles to have correct facecolors, edgecolors, and hatch patterns
+    import matplotlib.patches as mpatches
+    handles, labels = ax.get_legend_handles_labels()
+    legend_patches = [
+        mpatches.Patch(
+            facecolor=palette[idx % len(palette)],
+            edgecolor='black',
+            hatch=hatches[idx % len(hatches)],
+            label=labels[idx]
+        )
+        for idx in range(len(labels))
+    ]
+        
     ax.legend(
+        handles=legend_patches,
         title="Centrality Type",
         title_fontsize=14,
         fontsize=12,
