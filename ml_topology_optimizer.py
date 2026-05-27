@@ -203,13 +203,16 @@ def generate_paper_convergence_plot():
     ax3.set_xlabel("Controller", fontsize=18)
     ax3.grid(axis='y', linestyle='--', alpha=0.35)
     
-    # Annotate bars with values
-    for bar in bars:
+    # Keep value labels inside the axes and above error bars
+    y_max = max(m + s for m, s in zip(means, stds)) if means else 1.0
+    ax3.set_ylim(0, y_max * 1.15)
+    for bar, mean, std in zip(bars, means, stds):
         height = bar.get_height()
-        ax3.text(
-            bar.get_x() + bar.get_width() / 2,
-            height + max(means) * 0.03,  # small offset based on scale
+        ax3.annotate(
             f"{height:.1f}s",
+            xy=(bar.get_x() + bar.get_width() / 2, mean + std),
+            xytext=(0, 6),
+            textcoords="offset points",
             ha="center",
             va="bottom",
             fontweight="bold",
