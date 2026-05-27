@@ -1,17 +1,20 @@
 import os
-import shutil
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import networkx as nx
-import osmnx as ox
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from main import (
     prepare_topology, 
-    build_demand_schedule, 
     run_simulation_with_waiting_time, 
-    collapse_multidigraph,
-    parse_numeric
+)
+from centrality_comparison import (
+    ARRIVAL_RATE as BENCHMARK_ARRIVAL_RATE,
+    CENTRALITY_SCALE,
+    SIM_STEPS as BENCHMARK_SIM_STEPS,
+    WTM_SCORE_WEIGHTS,
+    build_bottleneck_routes,
+    build_demand_local,
+    get_graph_local,
 )
 
 # --- CONFIGURATION ---
@@ -19,72 +22,77 @@ CITIES = [
     ("Cubbon Park, Bengaluru, India", "Bengaluru"),
     ("Brandenburg Gate, Berlin, Germany", "Berlin"),
     ("Trafalgar Square, London, UK", "London"),
-    ("Sydney Opera House, Sydney, Australia", "Sydney")
+    ("Sydney Opera House, Sydney, Australia", "Sydney"),
 ]
 
-SIM_STEPS = 100 
-NUM_TRIALS = 100   
-DEMAND_LEVELS = {"Low": 50, "Med": 120, "High": 220}
-ARRIVAL_RATE = 120 
+SIM_STEPS = BENCHMARK_SIM_STEPS
+NUM_TRIALS = 20
+DEMAND_LEVELS = {"Low": 10, "Med": 16, "High": 24}
+ARRIVAL_RATE = BENCHMARK_ARRIVAL_RATE
+
 
 def get_city_graph(place, city_label):
-    print(f"Fetching {city_label}...")
-    raw_graph = ox.graph_from_address(place, dist=1500, network_type="drive", simplify=True)
-    largest_component = max(nx.strongly_connected_components(raw_graph), key=len)
-    raw_graph = raw_graph.subgraph(largest_component).copy()
-    G = collapse_multidigraph(raw_graph)
-    for u, v, data in G.edges(data=True):
-        data["length"] = float(data.get("length", 1.0))
-        data["speed_kph"] = parse_numeric(data.get("maxspeed"), 40.0)
-        data["lanes"] = max(1, int(round(parse_numeric(data.get("lanes"), 1.0))))
-        data["travel_time"] = data["length"] / max(data["speed_kph"] * 1000 / 3600, 1.0)
-        data["capacity_per_cycle"] = max(1, int(data["lanes"] * 8))
-    return G
+    print(f"Building bottleneck benchmark for {city_label}...")
+    return get_graph_local(place, city_label)
 
 def run_full_analysis(city_name, city_label):
     os.makedirs(city_label, exist_ok=True)
     G = get_city_graph(city_name, city_label)
-    bc = nx.betweenness_centrality(G, k=min(40, len(G)), weight="travel_time")
+    bc = nx.betweenness_centrality(G, weight="travel_time", normalized=True)
     max_bc = max(bc.values()) if bc else 1.0
-    for n in G.nodes(): G.nodes[n]['betweenness_norm'] = bc.get(n, 0.0) / max_bc
+    for n in G.nodes():
+        G.nodes[n]["betweenness_norm"] = bc.get(n, 0.0) / max_bc
     topology = prepare_topology(G)
-    candidate_nodes = [n for n in G.nodes() if G.in_degree(n) > 0 and G.out_degree(n) > 0]
-    routes = []
-    rng = np.random.default_rng(42)
-    while len(routes) < 20:
-        o, d = rng.choice(candidate_nodes, 2, replace=False)
-        try:
-            path = nx.shortest_path(G, o, d, weight="travel_time")
-            if 3 <= len(path) <= 8: routes.append({"edges": list(zip(path[:-1], path[1:]))})
-        except: continue
+    routes = build_bottleneck_routes(G, city_label, num_routes=14, seed=42)
 
     controllers = ["fixed", "backpressure", "dynamic_wtm"]
     results = {c: [] for c in controllers}
     for trial in range(NUM_TRIALS):
-        ds = build_demand_schedule(SIM_STEPS, ARRIVAL_RATE, 42 + trial)
+        ds = build_demand_local(SIM_STEPS, ARRIVAL_RATE, 42 + trial, routes)
         for ctrl in controllers:
-            res = run_simulation_with_waiting_time(G, routes, ds, ctrl, topology)
+            res = run_simulation_with_waiting_time(
+                G,
+                routes,
+                ds,
+                ctrl,
+                topology,
+                wtm_score_weights=WTM_SCORE_WEIGHTS,
+                centrality_scale=CENTRALITY_SCALE,
+            )
             results[ctrl].append(res)
-            
+
     demand_data = {ctrl: {"tp": [], "tt": []} for ctrl in controllers}
     for lbl, rate in DEMAND_LEVELS.items():
         for ctrl in controllers:
             tt_l, tp_l = [], []
-            for trial in range(1):
-                ds = build_demand_schedule(SIM_STEPS, rate, 42 + trial)
-                res = run_simulation_with_waiting_time(G, routes, ds, ctrl, topology)
+            for trial in range(3):
+                ds = build_demand_local(SIM_STEPS, rate, 77 + trial, routes)
+                res = run_simulation_with_waiting_time(
+                    G,
+                    routes,
+                    ds,
+                    ctrl,
+                    topology,
+                    wtm_score_weights=WTM_SCORE_WEIGHTS,
+                    centrality_scale=CENTRALITY_SCALE,
+                )
                 tt_l.append(res["avg_travel_time"])
                 tp_l.append(res["throughput"])
             demand_data[ctrl]["tt"].append(np.nanmean(tt_l) if not np.all(np.isnan(tt_l)) else 0)
             demand_data[ctrl]["tp"].append(np.mean(tp_l))
 
     plt.rcParams.update({
-        'font.size': 14,
-        'axes.linewidth': 2.0,
-        'axes.labelpad': 10,
-        'axes.titlepad': 14,
-        'xtick.major.pad': 6,
-        'ytick.major.pad': 6,
+        'font.size': 18,
+        'axes.titlesize': 22,
+        'axes.labelsize': 18,
+        'xtick.labelsize': 14,
+        'ytick.labelsize': 14,
+        'legend.fontsize': 14,
+        'axes.linewidth': 2.2,
+        'axes.labelpad': 12,
+        'axes.titlepad': 16,
+        'xtick.major.pad': 8,
+        'ytick.major.pad': 8,
         'legend.frameon': True,
     })
     colors = {"fixed": "#e74c3c", "backpressure": "#3498db", "dynamic_wtm": "#27ae60"}
@@ -103,10 +111,10 @@ def run_full_analysis(city_name, city_label):
         vals = [v if (not np.isnan(v) and v > 0) else 1e-3 for v in vals]
         bars = ax.bar(labels_short, vals, color=[colors[c] for c in controllers], edgecolor="black", linewidth=1.8)
         for b, h in zip(bars, hatches): b.set_hatch(h)
-        ax.set_title(f"{city_label} - {title_suffix}", fontweight='bold', fontsize=18)
-        ax.set_ylabel(ylabel, fontweight='bold', fontsize=15)
-        ax.tick_params(axis='x', labelsize=13)
-        ax.tick_params(axis='y', labelsize=13)
+        ax.set_title(f"{city_label} - {title_suffix}", fontweight='bold', fontsize=24)
+        ax.set_ylabel(ylabel, fontweight='bold', fontsize=18)
+        ax.tick_params(axis='x', labelsize=14)
+        ax.tick_params(axis='y', labelsize=14)
         ax.grid(axis='y', linestyle='--', alpha=0.35)
         fig.savefig(f"{city_label}/plot_{i+1}.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
         plt.close(fig)
@@ -118,10 +126,10 @@ def run_full_analysis(city_name, city_label):
     for j, patch in enumerate(bp['boxes']):
         patch.set(facecolor=colors[controllers[j]], edgecolor='black', linewidth=3)
         patch.set_hatch(hatches[j])
-    ax.set_title(f"{city_label} - Wait Time Spread", fontweight='bold', fontsize=18)
-    ax.set_ylabel("Wait Time (seconds) [Lower is Better]", fontweight='bold', fontsize=15)
-    ax.tick_params(axis='x', labelsize=13)
-    ax.tick_params(axis='y', labelsize=13)
+    ax.set_title(f"{city_label} - Wait Time Spread", fontweight='bold', fontsize=24)
+    ax.set_ylabel("Wait Time (seconds) [Lower is Better]", fontweight='bold', fontsize=18)
+    ax.tick_params(axis='x', labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
     ax.grid(axis='y', linestyle='--', alpha=0.35)
     fig.savefig(f"{city_label}/plot_4.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
     plt.close(fig)
@@ -139,11 +147,11 @@ def run_full_analysis(city_name, city_label):
             ax.plot(list(DEMAND_LEVELS.keys()), demand_data[ctrl][key], label=labels_short[j],
                     marker=markers[j], linestyle=linestyles[j], color=colors[ctrl], linewidth=2.8,
                     markersize=8, markeredgecolor='black')
-        ax.set_title(f"{city_label} - {title_suffix}", fontweight='bold', fontsize=18)
-        ax.set_ylabel(ylabel, fontweight='bold', fontsize=15)
-        ax.set_xlabel("Traffic Demand", fontweight='bold', fontsize=15)
-        ax.tick_params(axis='x', labelsize=13)
-        ax.tick_params(axis='y', labelsize=13)
+        ax.set_title(f"{city_label} - {title_suffix}", fontweight='bold', fontsize=24)
+        ax.set_ylabel(ylabel, fontweight='bold', fontsize=18)
+        ax.set_xlabel("Traffic Demand", fontweight='bold', fontsize=18)
+        ax.tick_params(axis='x', labelsize=14)
+        ax.tick_params(axis='y', labelsize=14)
         ax.legend(
             fontsize=12,
             frameon=True,
@@ -160,11 +168,11 @@ def run_full_analysis(city_name, city_label):
     # Row 7: Topology
     fig, ax = plt.subplots(figsize=(9.5, 7.0), constrained_layout=True)
     ax.hist(list(bc.values()), bins=15, color='#444444', edgecolor='black', alpha=0.8)
-    ax.set_title(f"{city_label} - Centrality Distribution", fontweight='bold', fontsize=18)
-    ax.set_ylabel("Frequency (Node Count) [n/a]", fontweight='bold', fontsize=15)
-    ax.set_xlabel("Betweenness Centrality", fontweight='bold', fontsize=15)
-    ax.tick_params(axis='x', labelsize=13)
-    ax.tick_params(axis='y', labelsize=13)
+    ax.set_title(f"{city_label} - Centrality Distribution", fontweight='bold', fontsize=24)
+    ax.set_ylabel("Frequency (Node Count)", fontweight='bold', fontsize=18)
+    ax.set_xlabel("Betweenness Centrality", fontweight='bold', fontsize=18)
+    ax.tick_params(axis='x', labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
     ax.grid(axis='y', linestyle='--', alpha=0.35)
     fig.savefig(f"{city_label}/plot_7.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
     plt.close(fig)
@@ -176,10 +184,10 @@ def run_full_analysis(city_name, city_label):
     param_colors = ["#f39c12", "#f1c40f", "#c0392b"]
     for j, patch in enumerate(bp['boxes']):
         patch.set(facecolor=param_colors[j], edgecolor='black', linewidth=3)
-    ax.set_title(f"{city_label} - Control Parameters", fontweight='bold', fontsize=18)
-    ax.set_ylabel("Weight Value [n/a]", fontweight='bold', fontsize=15)
-    ax.tick_params(axis='x', labelsize=13)
-    ax.tick_params(axis='y', labelsize=13)
+    ax.set_title(f"{city_label} - Control Parameters", fontweight='bold', fontsize=24)
+    ax.set_ylabel("Weight Value", fontweight='bold', fontsize=18)
+    ax.tick_params(axis='x', labelsize=14)
+    ax.tick_params(axis='y', labelsize=14)
     ax.grid(axis='y', linestyle='--', alpha=0.35)
     fig.savefig(f"{city_label}/plot_8.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
     plt.close(fig)

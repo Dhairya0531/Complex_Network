@@ -267,8 +267,15 @@ def choose_edge_for_node_wtm(
     node_importance,
     target_node_idx,
     topology_data,
+    score_weights=None,
 ):
     edge_caps = topology_data["edge_caps"]
+    weights = score_weights or {
+        "queue": 0.25,
+        "wait": 0.40,
+        "oldest": 0.30,
+        "source": 0.05,
+    }
 
     cumulative_wait = np.zeros(len(incoming), dtype=float)
     oldest_wait = np.zeros(len(incoming), dtype=float)
@@ -291,7 +298,12 @@ def choose_edge_for_node_wtm(
 
     # Waiting-time aware priority: queue pressure is still important, but old queues
     # and structurally central sources get explicit priority so starvation is reduced.
-    scores = 0.25 * queue_share + 0.40 * wait_share + 0.30 * oldest_share + 0.05 * source_importance
+    scores = (
+        weights["queue"] * queue_share
+        + weights["wait"] * wait_share
+        + weights["oldest"] * oldest_share
+        + weights["source"] * source_importance
+    )
     best_local_idx = int(np.argmax(scores))
     selected_idx = incoming[best_local_idx]
     return selected_idx, cumulative_wait[best_local_idx], oldest_wait[best_local_idx]
@@ -303,6 +315,8 @@ def run_simulation_with_waiting_time(
     demand_schedule,
     controller,
     topology=None,
+    wtm_score_weights=None,
+    centrality_scale=1.0,
 ):
     if topology is None:
         topology = prepare_topology(graph)
@@ -359,6 +373,7 @@ def run_simulation_with_waiting_time(
                         node_importance,
                         v_idx,
                         topology,
+                        score_weights=wtm_score_weights,
                     )
 
                 # --- LIVE-DYNAMIC TIMING ALLOCATION ---
@@ -379,7 +394,7 @@ def run_simulation_with_waiting_time(
 
                     # Calculate Structural Importance (Gamma term)
                     source_node_idx = edge_source_idx[selected_idx]
-                    importance_bonus = node_importance[source_node_idx]
+                    importance_bonus = node_importance[source_node_idx] * centrality_scale
 
                     # Use node-specific dynamic weights (learned via optimization)
                     situational_priority = np.clip(
@@ -573,12 +588,14 @@ if __name__ == "__main__":
 
     plt.rcParams.update(
         {
-            "font.size": 45,
-            "axes.titlesize": 50,
-            "axes.labelsize": 48,
-            "xtick.labelsize": 42,
-            "ytick.labelsize": 42,
-            "legend.fontsize": 38,
+            "font.size": 54,
+            "axes.titlesize": 60,
+            "axes.labelsize": 56,
+            "xtick.labelsize": 50,
+            "ytick.labelsize": 50,
+            "legend.fontsize": 44,
+            "axes.labelpad": 14,
+            "axes.titlepad": 18,
         }
     )
     plt.rcParams["hatch.linewidth"] = 3.0
@@ -614,7 +631,7 @@ if __name__ == "__main__":
         hatch=hatches,
     )
     _annotate_bars(ax1, bars)
-    ax1.set_ylabel("Avg Queue (vehicles)")
+    ax1.set_ylabel("Avg Queue (vehicles)", fontsize=56)
     clean_vals = [v for v in values if v is not None and not np.isnan(v)]
     if clean_vals:
         ax1.set_ylim(0, max(clean_vals) * 1.4)
@@ -636,7 +653,7 @@ if __name__ == "__main__":
         hatch=hatches,
     )
     _annotate_bars(ax2, bars)
-    ax2.set_ylabel("Avg Travel Time (s)")
+    ax2.set_ylabel("Avg Travel Time (s)", fontsize=56)
     clean_vals = [v for v in values if v is not None and not np.isnan(v)]
     if clean_vals:
         ax2.set_ylim(0, max(clean_vals) * 1.4)
@@ -658,7 +675,7 @@ if __name__ == "__main__":
         hatch=hatches,
     )
     _annotate_bars(ax3, bars, fmt="{:.0f}")
-    ax3.set_ylabel("Throughput (vehicles)")
+    ax3.set_ylabel("Throughput (vehicles)", fontsize=56)
     clean_vals = [v for v in values if v is not None and not np.isnan(v)]
     if clean_vals:
         ax3.set_ylim(0, max(clean_vals) * 1.4)
@@ -687,7 +704,7 @@ if __name__ == "__main__":
         patch.set_linewidth(2.0)
         patch.set_hatch(h)
     ax4.set_ylim(bottom=0)
-    ax4.set_ylabel("Avg Wait Time (s)")
+    ax4.set_ylabel("Avg Wait Time (s)", fontsize=56)
     ax4.grid(axis="y", alpha=0.3, linestyle="--")
     # ax.legend(bp["boxes"], labels_short, loc='best')
     plt.tight_layout()
@@ -722,7 +739,7 @@ if __name__ == "__main__":
         )
     ax5.set_xticks(x_pos)
     ax5.set_xticklabels(list(demand_levels.keys()))
-    ax5.set_ylabel("Throughput")
+    ax5.set_ylabel("Throughput", fontsize=56)
     ax5.grid(alpha=0.3, linestyle="--")
     # ax.legend(loc='upper left')
     plt.tight_layout()
@@ -742,7 +759,7 @@ if __name__ == "__main__":
         )
     ax6.set_xticks(x_pos)
     ax6.set_xticklabels(list(demand_levels.keys()))
-    ax6.set_ylabel("Avg Travel Time (s)")
+    ax6.set_ylabel("Avg Travel Time (s)", fontsize=56)
     ax6.grid(alpha=0.3, linestyle="--")
     # ax.legend(loc='upper left')
     plt.tight_layout()
@@ -759,8 +776,8 @@ if __name__ == "__main__":
         label="Centrality"
     )
     # ax.legend(loc='upper right')
-    ax7.set_ylabel("Frequency")
-    ax7.set_xlabel("Betweenness Centrality")
+    ax7.set_ylabel("Frequency", fontsize=56)
+    ax7.set_xlabel("Betweenness Centrality", fontsize=56)
     ax7.grid(axis="y", alpha=0.3, linestyle="--")
     plt.tight_layout()
     plt.savefig("plot_7.png", dpi=200)
@@ -780,7 +797,7 @@ if __name__ == "__main__":
         patch.set_facecolor(param_colors[i])
         patch.set_edgecolor("black")
         patch.set_alpha(0.8)
-    ax8.set_ylabel("Value")
+    ax8.set_ylabel("Value", fontsize=56)
     ax8.grid(axis="y", alpha=0.3, linestyle="--")
     # ax.legend(bp8["boxes"], ["Alpha", "Beta", "Gamma"], loc='lower right')
     plt.tight_layout()

@@ -3,14 +3,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import networkx as nx
-import osmnx as ox
 
 from main import (
-    build_demand_schedule,
-    collapse_multidigraph,
-    parse_numeric,
     prepare_topology,
     run_simulation_with_waiting_time,
+)
+from centrality_comparison import (
+    ARRIVAL_RATE as BENCHMARK_ARRIVAL_RATE,
+    CENTRALITY_SCALE,
+    SIM_STEPS as BENCHMARK_SIM_STEPS,
+    WTM_SCORE_WEIGHTS,
+    build_bottleneck_routes,
+    build_demand_local,
+    get_graph_local as benchmark_get_graph_local,
 )
 
 # --- CONFIGURATION FOR PAPER PLOT ---
@@ -19,31 +24,15 @@ CITY_NAME = "Brandenburg Gate, Berlin, Germany"
 CITY_LABEL = "Berlin"
 
 EPOCHS = 10  # Match user's request for 10 iterations
-SIM_STEPS = 60
+SIM_STEPS = BENCHMARK_SIM_STEPS
 POPULATION_SIZE = 4
 LEARNING_RATE = 0.15
 
 def get_graph_local(place):
-    print(f"\nFetching network for: {place}")
-    try:
-        raw_graph = ox.graph_from_address(place, dist=1500, network_type="drive", simplify=True)
-    except:
-        raw_graph = ox.graph_from_address(place, dist=1500, network_type="drive", simplify=True)
+    print(f"\nBuilding bottleneck benchmark for: {place}")
+    return benchmark_get_graph_local(place, CITY_LABEL)
 
-    largest_component = max(nx.strongly_connected_components(raw_graph), key=len)
-    raw_graph = raw_graph.subgraph(largest_component).copy()
-    G = collapse_multidigraph(raw_graph)
-    print(f"Graph loaded: {len(G.nodes)} nodes, {len(G.edges)} edges")
-
-    for u, v, data in G.edges(data=True):
-        data["length"] = float(data.get("length", 1.0))
-        data["speed_kph"] = parse_numeric(data.get("maxspeed"), 35.0)
-        data["lanes"] = max(1, int(round(parse_numeric(data.get("lanes"), 1.0))))
-        data["travel_time"] = data["length"] / max(data["speed_kph"] * 1000 / 3600, 1.0)
-        data["capacity_per_cycle"] = max(1, int(data["lanes"] * 8))
-    return G
-
-def build_demand_local(steps, arrival_rate, seed, num_routes):
+def build_demand_local(steps, arrival_rate, seed, routes):
     local_rng = np.random.default_rng(seed)
     schedule = []
     for _ in range(steps):
@@ -51,7 +40,7 @@ def build_demand_local(steps, arrival_rate, seed, num_routes):
         if arrivals == 0:
             schedule.append([])
             continue
-        chosen_routes = local_rng.integers(0, num_routes, size=arrivals)
+        chosen_routes = local_rng.integers(0, len(routes), size=arrivals)
         schedule.append(chosen_routes.tolist())
     return schedule
 
@@ -74,30 +63,29 @@ def run_evaluation(graph, routes, demand, theta, controller="dynamic_wtm"):
     else:
         topology = prepare_topology(graph)
 
-    res = run_simulation_with_waiting_time(graph, routes, demand, controller, topology)
+    res = run_simulation_with_waiting_time(
+        graph,
+        routes,
+        demand,
+        controller,
+        topology,
+        wtm_score_weights=WTM_SCORE_WEIGHTS,
+        centrality_scale=CENTRALITY_SCALE,
+    )
     return res["avg_travel_time"] if not np.isnan(res["avg_travel_time"]) else 1e6
 
 def generate_paper_convergence_plot():
     G = get_graph_local(CITY_NAME)
     
     # Pre-calculate Betweenness
-    bc = nx.betweenness_centrality(G, k=min(60, len(G)), weight="travel_time")
+    bc = nx.betweenness_centrality(G, weight="travel_time", normalized=True)
     max_bc = max(bc.values()) if bc else 1.0
     for n in G.nodes():
         G.nodes[n]["betweenness_norm"] = bc.get(n, 0.0) / max_bc
 
-    candidate_nodes = [n for n in G.nodes() if G.in_degree(n) > 0 and G.out_degree(n) > 0]
-    routes = []
-    rng = np.random.default_rng(42)
-    while len(routes) < 40:
-        o, d = rng.choice(candidate_nodes, 2, replace=False)
-        try:
-            path = nx.shortest_path(G, o, d, weight="travel_time")
-            if len(path) > 3:
-                routes.append({"edges": list(zip(path[:-1], path[1:]))})
-        except: continue
+    routes = build_bottleneck_routes(G, CITY_LABEL, num_routes=14, seed=42)
 
-    demand = build_demand_local(SIM_STEPS, 400, 42, len(routes))
+    demand = build_demand_local(SIM_STEPS, BENCHMARK_ARRIVAL_RATE, 42, routes)
 
     # Optimization
     theta = np.array([0.35, 0.4, 0.35, 0.1, 0.75]) # Starting from a reasonable point to show smooth convergence
@@ -129,10 +117,10 @@ def generate_paper_convergence_plot():
     num_eval_trials = 10
     results_travel_time = {c: [] for c in ["fixed", "backpressure", "dynamic_wtm"]}
     
-    print(f"\n>>> Running {num_eval_trials} evaluation trials on saturated traffic ...")
+    print(f"\n>>> Running {num_eval_trials} evaluation trials on bottleneck traffic ...")
     for trial in range(num_eval_trials):
         seed = 200 + trial
-        trial_demand = build_demand_local(SIM_STEPS, 400, seed, len(routes))
+        trial_demand = build_demand_local(SIM_STEPS, BENCHMARK_ARRIVAL_RATE, seed, routes)
         for ctrl in ["fixed", "backpressure", "dynamic_wtm"]:
             t_time = run_evaluation(G, routes, trial_demand, theta, controller=ctrl)
             results_travel_time[ctrl].append(t_time)
@@ -141,21 +129,26 @@ def generate_paper_convergence_plot():
     # --- PLOTTING (VERTICAL IEEE STYLE) ---
     plt.rcParams.update({
         'font.family': 'serif',
-        'font.size': 12,
+        'font.size': 16,
+        'axes.titlesize': 20,
+        'axes.labelsize': 18,
+        'xtick.labelsize': 15,
+        'ytick.labelsize': 15,
+        'legend.fontsize': 14,
         'axes.labelweight': 'bold',
-        'axes.titlesize': 14,
         'axes.titleweight': 'bold',
         'grid.alpha': 0.3,
         'lines.linewidth': 2.0
     })
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 15), constrained_layout=True)
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12.5, 17), constrained_layout=False)
+    fig.subplots_adjust(left=0.22, right=0.98, top=0.96, bottom=0.06, hspace=0.45)
 
     # Plot 1: Efficiency (Blue line)
     ax1.plot(history, color='#3498db', linewidth=2.5)
-    ax1.set_title("Convergence of Traffic Efficiency")
-    ax1.set_ylabel("Avg Travel Time (seconds) [Lower is Better]")
-    ax1.set_xlabel("Epoch (Training Iteration)")
+    ax1.set_title("Convergence of Traffic Efficiency", fontsize=24)
+    ax1.set_ylabel("Avg Travel Time (seconds)\n[Lower is Better]", fontsize=16, labelpad=12)
+    ax1.set_xlabel("Epoch (Training Iteration)", fontsize=18)
     ax1.grid(True, linestyle='--')
 
     # Plot 2: Coefficients (Colored, distinct styles & markers)
@@ -176,9 +169,9 @@ def generate_paper_convergence_plot():
             linewidth=2.0
         )
     
-    ax2.set_title("Convergence of Formula Coefficients")
-    ax2.set_ylabel("Coefficient Value [n/a]")
-    ax2.set_xlabel("Epoch")
+    ax2.set_title("Convergence of Formula Coefficients", fontsize=24)
+    ax2.set_ylabel("Coefficient Value", fontsize=16, labelpad=12)
+    ax2.set_xlabel("Epoch", fontsize=18)
     ax2.set_ylim(-0.05, 1.05)
     ax2.grid(True, linestyle='--')
     ax2.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=True)
@@ -205,9 +198,9 @@ def generate_paper_convergence_plot():
     for b, h in zip(bars, hatches):
         b.set_hatch(h)
         
-    ax3.set_title("Performance Comparison (100 Random Traffic Trials)")
-    ax3.set_ylabel("Avg Travel Time (seconds) [Lower is Better]")
-    ax3.set_xlabel("Controller")
+    ax3.set_title("Performance Comparison (100 Random Traffic Trials)", fontsize=24)
+    ax3.set_ylabel("Avg Travel Time (seconds)\n[Lower is Better]", fontsize=16, labelpad=12)
+    ax3.set_xlabel("Controller", fontsize=18)
     ax3.grid(axis='y', linestyle='--', alpha=0.35)
     
     # Annotate bars with values
@@ -220,7 +213,7 @@ def generate_paper_convergence_plot():
             ha="center",
             va="bottom",
             fontweight="bold",
-            fontsize=10
+            fontsize=14
         )
         
     import matplotlib.patches as mpatches
