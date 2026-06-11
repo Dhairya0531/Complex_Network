@@ -129,16 +129,14 @@ def generate_paper_convergence_plot():
     # --- PLOTTING (VERTICAL IEEE STYLE) ---
     plt.rcParams.update({
         'font.family': 'serif',
-        'font.size': 16,
-        'axes.titlesize': 20,
-        'axes.labelsize': 18,
-        'xtick.labelsize': 15,
-        'ytick.labelsize': 15,
-        'legend.fontsize': 14,
+        'font.size': 24,
+        'axes.labelsize': 26,
+        'xtick.labelsize': 22,
+        'ytick.labelsize': 22,
+        'legend.fontsize': 22,
         'axes.labelweight': 'bold',
-        'axes.titleweight': 'bold',
         'grid.alpha': 0.3,
-        'lines.linewidth': 2.0
+        'lines.linewidth': 2.5
     })
 
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12.5, 17), constrained_layout=False)
@@ -146,9 +144,8 @@ def generate_paper_convergence_plot():
 
     # Plot 1: Efficiency (Blue line)
     ax1.plot(history, color='#3498db', linewidth=2.5)
-    ax1.set_title("Convergence of Traffic Efficiency", fontsize=24)
-    ax1.set_ylabel("Avg Travel Time (seconds)\n[Lower is Better]", fontsize=16, labelpad=12)
-    ax1.set_xlabel("Epoch (Training Iteration)", fontsize=18)
+    ax1.set_ylabel("Avg Travel Time (seconds)\n[Lower is Better]", fontsize=20, labelpad=12)
+    ax1.set_xlabel("Epoch (Training Iteration)", fontsize=20)
     ax1.grid(True, linestyle='--')
 
     # Plot 2: Coefficients (Colored, distinct styles & markers)
@@ -165,22 +162,22 @@ def generate_paper_convergence_plot():
             color=colors_lines[i], 
             linestyle=ls, 
             marker=marker, 
+            markersize=12,
             markevery=5,
             linewidth=2.0
         )
     
-    ax2.set_title("Convergence of Formula Coefficients", fontsize=24)
-    ax2.set_ylabel("Coefficient Value", fontsize=16, labelpad=12)
-    ax2.set_xlabel("Epoch", fontsize=18)
+    ax2.set_ylabel("Coefficient Value", fontsize=20, labelpad=12)
+    ax2.set_xlabel("Epoch", fontsize=20)
     ax2.set_ylim(-0.05, 1.05)
     ax2.grid(True, linestyle='--')
-    ax2.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=True)
+    ax2.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=True, fontsize=16)
 
     # Plot 3: 100-Trial Comparison Bar Plot (Red, Blue, Green, hatches, error bars)
     controllers = ["fixed", "backpressure", "dynamic_wtm"]
     labels_short = ["Fixed", "BP", "Optimized WTM"]
-    colors_bars = {"fixed": "#e74c3c", "backpressure": "#3498db", "dynamic_wtm": "#27ae60"}
-    hatches = ["///", "\\\\\\\\", "xx"]
+    colors_bars = {"fixed": "#ffcccc", "backpressure": "#cce5ff", "dynamic_wtm": "#ccffcc"}
+    hatches = ["/", "\\", "x"]
     
     means = [np.mean(results_travel_time[c]) for c in controllers]
     stds = [np.std(results_travel_time[c]) for c in controllers]
@@ -198,9 +195,8 @@ def generate_paper_convergence_plot():
     for b, h in zip(bars, hatches):
         b.set_hatch(h)
         
-    ax3.set_title("Performance Comparison (100 Random Traffic Trials)", fontsize=24)
-    ax3.set_ylabel("Avg Travel Time (seconds)\n[Lower is Better]", fontsize=16, labelpad=12)
-    ax3.set_xlabel("Controller", fontsize=18)
+    ax3.set_ylabel("Avg Travel Time (seconds)\n[Lower is Better]", fontsize=20, labelpad=12)
+    ax3.set_xlabel("Controller", fontsize=20)
     ax3.grid(axis='y', linestyle='--', alpha=0.35)
     
     # Keep value labels inside the axes and above error bars
@@ -216,16 +212,16 @@ def generate_paper_convergence_plot():
             ha="center",
             va="bottom",
             fontweight="bold",
-            fontsize=14
+            fontsize=16
         )
         
     import matplotlib.patches as mpatches
     legend_patches = [
-        mpatches.Patch(facecolor="#e74c3c", edgecolor="black", hatch="///", label="Fixed (Baseline)"),
-        mpatches.Patch(facecolor="#3498db", edgecolor="black", hatch="\\\\\\\\", label="Backpressure"),
-        mpatches.Patch(facecolor="#27ae60", edgecolor="black", hatch="xx", label="Optimized WTM")
+        mpatches.Patch(facecolor="#ffcccc", edgecolor="black", hatch="/", label="Fixed (Baseline)"),
+        mpatches.Patch(facecolor="#cce5ff", edgecolor="black", hatch="\\", label="Backpressure"),
+        mpatches.Patch(facecolor="#ccffcc", edgecolor="black", hatch="x", label="Optimized WTM")
     ]
-    ax3.legend(handles=legend_patches, loc="upper right", frameon=True, framealpha=0.95)
+    ax3.legend(handles=legend_patches, loc="upper right", frameon=True, framealpha=0.95, fontsize=16)
 
     output_path = "ml_optimization_convergence.png"
     plt.savefig(output_path, dpi=300, bbox_inches='tight')

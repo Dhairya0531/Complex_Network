@@ -82,28 +82,26 @@ def run_full_analysis(city_name, city_label):
             demand_data[ctrl]["tp"].append(np.mean(tp_l))
 
     plt.rcParams.update({
-        'font.size': 18,
-        'axes.titlesize': 22,
-        'axes.labelsize': 18,
-        'xtick.labelsize': 14,
-        'ytick.labelsize': 14,
-        'legend.fontsize': 14,
+        'font.size': 24,
+        'axes.labelsize': 26,
+        'xtick.labelsize': 22,
+        'ytick.labelsize': 22,
+        'legend.fontsize': 22,
         'axes.linewidth': 2.2,
         'axes.labelpad': 12,
-        'axes.titlepad': 16,
         'xtick.major.pad': 8,
         'ytick.major.pad': 8,
         'legend.frameon': True,
     })
-    colors = {"fixed": "#e74c3c", "backpressure": "#3498db", "dynamic_wtm": "#27ae60"}
-    hatches = ["///", "\\\\\\\\", "xx"]
+    colors = {"fixed": "#ffcccc", "backpressure": "#cce5ff", "dynamic_wtm": "#ccffcc"}
+    hatches = ["/", "\\", "x"]
     labels_short = ["Fixed", "BP", "Proposed"]
     
     # Rows 1-3: Bars
     metrics = [
-        ("avg_queue_length", "Avg Queue Length (vehicles) [Lower is Better]", "Avg Queue Length"),
-        ("avg_travel_time", "Avg Travel Time (seconds) [Lower is Better]", "Avg Travel Time"),
-        ("throughput", "Throughput (vehicles) [Higher is Better]", "Throughput")
+        ("avg_queue_length", "Avg Queue Length (vehicles)\n[Lower is Better]", "Avg Queue Length"),
+        ("avg_travel_time", "Avg Travel Time (seconds)\n[Lower is Better]", "Avg Travel Time"),
+        ("throughput", "Throughput (vehicles)\n[Higher is Better]", "Throughput")
     ]
     for i, (key, ylabel, title_suffix) in enumerate(metrics):
         fig, ax = plt.subplots(figsize=(9.5, 7.0), constrained_layout=True)
@@ -111,10 +109,9 @@ def run_full_analysis(city_name, city_label):
         vals = [v if (not np.isnan(v) and v > 0) else 1e-3 for v in vals]
         bars = ax.bar(labels_short, vals, color=[colors[c] for c in controllers], edgecolor="black", linewidth=1.8)
         for b, h in zip(bars, hatches): b.set_hatch(h)
-        ax.set_title(f"{city_label} - {title_suffix}", fontweight='bold', fontsize=24)
-        ax.set_ylabel(ylabel, fontweight='bold', fontsize=18)
-        ax.tick_params(axis='x', labelsize=14)
-        ax.tick_params(axis='y', labelsize=14)
+        ax.set_ylabel(ylabel, fontweight='bold', fontsize=22)
+        ax.tick_params(axis='x', labelsize=20)
+        ax.tick_params(axis='y', labelsize=20)
         ax.grid(axis='y', linestyle='--', alpha=0.35)
         fig.savefig(f"{city_label}/plot_{i+1}.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
         plt.close(fig)
@@ -126,18 +123,17 @@ def run_full_analysis(city_name, city_label):
     for j, patch in enumerate(bp['boxes']):
         patch.set(facecolor=colors[controllers[j]], edgecolor='black', linewidth=3)
         patch.set_hatch(hatches[j])
-    ax.set_title(f"{city_label} - Wait Time Spread", fontweight='bold', fontsize=24)
-    ax.set_ylabel("Wait Time (seconds) [Lower is Better]", fontweight='bold', fontsize=18)
-    ax.tick_params(axis='x', labelsize=14)
-    ax.tick_params(axis='y', labelsize=14)
+    ax.set_ylabel("Wait Time (seconds)\n[Lower is Better]", fontweight='bold', fontsize=22)
+    ax.tick_params(axis='x', labelsize=20)
+    ax.tick_params(axis='y', labelsize=20)
     ax.grid(axis='y', linestyle='--', alpha=0.35)
     fig.savefig(f"{city_label}/plot_4.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
     plt.close(fig)
 
     # Rows 5-6: Demand
     demand_metrics = [
-        ("tp", "Throughput (vehicles) [Higher is Better]", "Throughput vs Demand"),
-        ("tt", "Avg Travel Time (seconds) [Lower is Better]", "Travel Time vs Demand")
+        ("tp", "Throughput (vehicles)\n[Higher is Better]", "Throughput vs Demand"),
+        ("tt", "Avg Travel Time (seconds)\n[Lower is Better]", "Travel Time vs Demand")
     ]
     linestyles = [":", "--", "-"]
     markers = ["s", "^", "o"]
@@ -146,14 +142,13 @@ def run_full_analysis(city_name, city_label):
         for j, ctrl in enumerate(controllers):
             ax.plot(list(DEMAND_LEVELS.keys()), demand_data[ctrl][key], label=labels_short[j],
                     marker=markers[j], linestyle=linestyles[j], color=colors[ctrl], linewidth=2.8,
-                    markersize=8, markeredgecolor='black')
-        ax.set_title(f"{city_label} - {title_suffix}", fontweight='bold', fontsize=24)
-        ax.set_ylabel(ylabel, fontweight='bold', fontsize=18)
-        ax.set_xlabel("Traffic Demand", fontweight='bold', fontsize=18)
-        ax.tick_params(axis='x', labelsize=14)
-        ax.tick_params(axis='y', labelsize=14)
+                    markersize=14, markeredgecolor='black')
+        ax.set_ylabel(ylabel, fontweight='bold', fontsize=22)
+        ax.set_xlabel("Traffic Demand", fontweight='bold', fontsize=22)
+        ax.tick_params(axis='x', labelsize=20)
+        ax.tick_params(axis='y', labelsize=20)
         ax.legend(
-            fontsize=12,
+            fontsize=18,
             frameon=True,
             framealpha=0.95,
             loc='center left',
@@ -168,11 +163,10 @@ def run_full_analysis(city_name, city_label):
     # Row 7: Topology
     fig, ax = plt.subplots(figsize=(9.5, 7.0), constrained_layout=True)
     ax.hist(list(bc.values()), bins=15, color='#444444', edgecolor='black', alpha=0.8)
-    ax.set_title(f"{city_label} - Centrality Distribution", fontweight='bold', fontsize=24)
-    ax.set_ylabel("Frequency (Node Count)", fontweight='bold', fontsize=18)
-    ax.set_xlabel("Betweenness Centrality", fontweight='bold', fontsize=18)
-    ax.tick_params(axis='x', labelsize=14)
-    ax.tick_params(axis='y', labelsize=14)
+    ax.set_ylabel("Frequency (Node Count)", fontweight='bold', fontsize=26)
+    ax.set_xlabel("Betweenness Centrality", fontweight='bold', fontsize=26)
+    ax.tick_params(axis='x', labelsize=22)
+    ax.tick_params(axis='y', labelsize=22)
     ax.grid(axis='y', linestyle='--', alpha=0.35)
     fig.savefig(f"{city_label}/plot_7.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
     plt.close(fig)
@@ -184,10 +178,9 @@ def run_full_analysis(city_name, city_label):
     param_colors = ["#f39c12", "#f1c40f", "#c0392b"]
     for j, patch in enumerate(bp['boxes']):
         patch.set(facecolor=param_colors[j], edgecolor='black', linewidth=3)
-    ax.set_title(f"{city_label} - Control Parameters", fontweight='bold', fontsize=24)
-    ax.set_ylabel("Weight Value", fontweight='bold', fontsize=18)
-    ax.tick_params(axis='x', labelsize=14)
-    ax.tick_params(axis='y', labelsize=14)
+    ax.set_ylabel("Weight Value", fontweight='bold', fontsize=26)
+    ax.tick_params(axis='x', labelsize=22)
+    ax.tick_params(axis='y', labelsize=22)
     ax.grid(axis='y', linestyle='--', alpha=0.35)
     fig.savefig(f"{city_label}/plot_8.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
     plt.close(fig)

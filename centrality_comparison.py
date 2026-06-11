@@ -306,23 +306,21 @@ def run_multi_city_comparison():
 
     plt.rcParams.update(
         {
-            "font.size": 16,
-            "axes.titlesize": 22,
-            "axes.labelsize": 18,
-            "xtick.labelsize": 15,
-            "ytick.labelsize": 15,
-            "legend.fontsize": 15,
+            "font.size": 24,
+            "axes.labelsize": 26,
+            "xtick.labelsize": 22,
+            "ytick.labelsize": 22,
+            "legend.fontsize": 22,
             "axes.linewidth": 2.0,
             "axes.labelpad": 12,
-            "axes.titlepad": 16,
             "xtick.major.pad": 8,
             "ytick.major.pad": 8,
             "legend.frameon": True,
         }
     )
     fig, ax = plt.subplots(figsize=(14, 8), constrained_layout=True)
-    palette = ["#27ae60", "#3498db", "#e67e22", "#9b59b6"]
-    hatches = ["///", "\\\\\\\\", "xx", ".."]
+    palette = ["#ccffcc", "#cce5ff", "#ffe5cc", "#e5ccff"]
+    hatches = ["/", "\\", "x", "."]
     plt.rcParams["hatch.linewidth"] = 2.2
     pivot_df.plot(
         kind="bar",
@@ -341,11 +339,10 @@ def run_multi_city_comparison():
             bar.set_edgecolor("black")
             bar.set_hatch(hatch)
 
-    ax.set_ylabel("Effective Travel Time (seconds) [Lower is Better]", fontweight="bold", fontsize=18)
-    ax.set_xlabel("City", fontweight="bold", fontsize=18)
-    ax.set_title("Impact of Centrality Metric on Performance", fontweight="bold", fontsize=24)
-    ax.tick_params(axis="x", labelrotation=0, labelsize=15)
-    ax.tick_params(axis="y", labelsize=15)
+    ax.set_ylabel("Effective Travel Time (seconds)\n[Lower is Better]", fontweight="bold", fontsize=22)
+    ax.set_xlabel("City", fontweight="bold", fontsize=22)
+    ax.tick_params(axis="x", labelrotation=0, labelsize=18)
+    ax.tick_params(axis="y", labelsize=18)
     ax.grid(axis="y", linestyle="--", alpha=0.35)
 
     import matplotlib.patches as mpatches
@@ -364,8 +361,8 @@ def run_multi_city_comparison():
     ax.legend(
         handles=legend_patches,
         title="Centrality Type",
-        title_fontsize=16,
-        fontsize=14,
+        title_fontsize=18,
+        fontsize=16,
         loc="upper left",
         bbox_to_anchor=(1.02, 1.0),
         borderaxespad=0.0,

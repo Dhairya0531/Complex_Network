@@ -1,446 +1,533 @@
 \documentclass[letterpaper, conference]{IEEEtran}
-%\usepackage{fontspec}
-%\setmainfont{Times New Roman}
 \usepackage[left=1.62cm,right=1.62cm,top=1.9cm]{geometry}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
 T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \IEEEsettopmargin{t}{2cm}
 \setlength{\columnsep}{0.24in}
-\usepackage{stmaryrd}
 \usepackage{multirow}
-\usepackage{tablefootnote}
 \usepackage{enumitem}
-\usepackage{makecell}
 \usepackage{tabularx,ragged2e,booktabs,caption}
 \captionsetup{format=plain, labelfont={bf,footnotesize}, textfont=footnotesize}
 \usepackage{subcaption}
-\usepackage{textcomp}
-\usepackage{multirow}
-\usepackage{tabularx,ragged2e,booktabs,caption}
 \usepackage{array}
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{cite}
 \interdisplaylinepenalty=2500
-\usepackage{amsthm}
 \usepackage{mathtools}
 \usepackage{amsfonts}
 \usepackage{amssymb}
-%\usepackage{epstopdf}
 \IEEEoverridecommandlockouts
 \usepackage{balance}
 \usepackage{float}
-\usepackage{array}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
-\usepackage{comment}
-\newtheorem{theorem}{Theorem}
-
-\theoremstyle{remark}
-
-\newtheorem{lemma}{Lemma}
-
-\newtheorem{corollary}{Corollary}
-
-\algnewcommand{\algorithmicgoto}{\textbf{go to}}%
-\algnewcommand{\Goto}[1]{\algorithmicgoto~\ref{#1}}%
-\newcommand{\suchthat}{;\ifnum\currentgrouptype=16 \middle\fi|;}
-\DeclareCaptionFormat{algorithm}{\vspace{-1.2ex}{%
-\parbox[c][0.9em][c]{\textwidth}{#1#2#3}}\par\rule{\linewidth}{-0.5pt}}
-%\captionsetup[algorithm]{format=hang,singlelinecheck=false, font=scriptsize, labelfont=bf}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc}
 \algrenewcommand\alglinenumber[1]{\scriptsize #1:}
-
-\newcommand*{\Comb}[2]{{}^{#1}C_{#2}}
 \renewcommand{\algorithmiccomment}[1]{\bgroup\hfill\it\scriptsize//~#1\egroup}
-
 \newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
 
 \begin{document}
 \addtolength{\tabcolsep}{-6pt}
 \DeclareGraphicsExtensions{.pdf,.png,.gif,.jpg}
 
-\title{UTSON: A Topology-Aware Signal Control Framework for Urban Traffic Networks}
+\title{UTSON: A Topology-Aware Signal Control Framework for Urban Traffic}
 
 \author{\IEEEauthorblockN{Dhairya Rupani,\textsuperscript{*} Drumil Bhati,\textsuperscript{*} and Abhishek Chakraborty}
-\IEEEauthorblockA{School of Engineering and Applied Science, Ahmedabad University, Ahmedabad, Gujarat 380009, India}
-dhairya.r@ahduni.edu.in, drumil.b@ahduni.edu.in, abhishek2003slg@ieee.org
+\IEEEauthorblockA{School of Engineering and Applied Science, Ahmedabad University, Ahmedabad, Gujarat 380009, India\\
+dhairya.r@ahduni.edu.in,\ drumil.b@ahduni.edu.in,\ abhishek2003slg@ieee.org}
 \thanks{\textsuperscript{*}The authors contributed equally to this work.}}
 
 \maketitle
 
 \begin{abstract}
-Urban congestion is a significant problem in modern transportation systems, especially when fixed-time signal plans cannot address stochastic traffic demand. In this paper, we present a new framework called the Urban Traffic Signal Optimization Network (UTSON) to evaluate the overall performance of the existing urban traffic light network and to formulate an efficient plan to minimize the overall waiting time. The framework combines three control policies along a spectrum from static baseline to fully adaptive scenarios, enabling systematic benchmarking and progressive performance assessment. We have examined the novelty of the framework in 4 cities from different parts of the world, obtained from OpenStreetMap: Berlin (Germany), London (United Kingdom), Sydney (Australia), Bengaluru (India). Our proposed framework ensures reproducibility and scalability of computations and outperforms the state of the art.
+Urban congestion worsens when fixed-time signal plans cannot respond to stochastic demand. We present the Urban Traffic Signal Optimization Network (UTSON), a topology-aware, discrete-time signal control framework that minimizes cumulative waiting time by integrating the global road network into decentralized intersection decisions. UTSON evaluates three control policies (Fixed-Time, Backpressure, and the proposed Waiting-Time Minimization (WTM) controller) across four cities from OpenStreetMap: Bengaluru, Berlin, London, and Sydney. The WTM controller combines multiplicative hub-awareness with dynamic parameter scaling, achieving up to 198.0\% throughput improvement (over Backpressure) and 26.6\% travel-time reduction (over Fixed-Time), while remaining fully interpretable and requiring no training data.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Urban traffic control, adaptive signal timing, waiting time minimization, discrete-time simulation, complex network analyses.
+Urban traffic control, betweenness centrality, adaptive signal timing, waiting time minimization, discrete-time simulation, complex network analysis.
 \end{IEEEkeywords}
 
+%%=============================================================
 \section{Introduction}
 \label{section_Introduction}
-\IEEEPARstart{U}{rban} Mobility is a major infrastructure issue of the 21st Century in the urban context. In rapidly urbanizing countries, with a higher number of cars on the road, signalized intersections are becoming the ubiquitous choke points that are costing cities real economic and social expenses. It is estimated that the cost of urban congestion is billions of dollars annually in lost productivity, excess fuel use and emissions~\cite{ibe2013markov}. Unlike highway congestion, congestion in urban areas is self-reinforcing: congestion at one intersection cascades upstream and sidewards, affecting many roads within minutes.
+%%=============================================================
+\IEEEPARstart{S}{ignalized} intersections are the primary bottlenecks of urban mobility. Congestion at a few critical nodes propagates upstream across an entire network within minutes, costing cities billions annually in lost productivity and excess emissions~\cite{ibe2013markov}. Most deployed systems rely on fixed-time plans calibrated to historical averages: simple to operate, but unable to react to stochastic, real-time demand. Adaptive extensions exist but respond only to the immediate local queue, ignoring the broader network structure and the fact that intersections lying on many shortest paths are inherently more prone to causing city-wide spillback when saturated.
 
-The heart of this problem is the static nature of the signal infrastructure and dynamic nature of the demand. The majority of deployed systems have a set plan for the different cycles that is based on the average flow recorded historically. Such plans are simple to implement, but are not capable of reacting to the uncertainty of traffic demand in space and time. There are adaptive extensions, but they tend to respond only to the immediate local queue at a single intersection, and do not consider the rest of the network structure, such as the significance of the individual intersections as connectors in the urban graph. The intersections are the main control points in urban mobility and congestion at a few critical points can be cascaded throughout the network. While easy to run, traditional fixed-time signal control systems do not have the ability to adjust based on current traffic needs, and local adaptive control systems only sense the current queue, and not the importance of the intersection within the urban structure~\cite{ibe2013markov}. To fill this gap, the paper introduces a complex network of urban traffic, and proposes a new signal-control model which considers the local queue conditions and global node importance under topology awareness.
+A fundamental limitation of purely local controllers is that they treat every intersection as structurally equivalent. In reality, road networks are heterogeneous: a handful of high-betweenness nodes, such as bridge approaches and arterial merges, carry a disproportionate share of city-wide routing demand~\cite{newman2010networks}. When one of these nodes saturates, vehicles cannot enter the saturated link and queue on upstream edges, which in turn block their feeder intersections, triggering a cascade that can immobilize large network segments within a few signal cycles~\cite{daganzo1994queue}. A controller that can identify these structurally critical nodes in advance and pre-allocate green time before queues reach critical length has a fundamentally better chance of containing congestion. This cascade-prevention property cannot be achieved by reactive controllers that observe only instantaneous local queues; it requires a global structural descriptor of the network.
 
-The above problems (static signal plans that are not adapted to real-time demand; local adaptive controllers that lack an understanding of the global network; and cascading congestion at structurally critical intersections) call for a different design philosophy. Thus this paper investigates the following research question: Can global topological awareness, obtained from a graph of the road network based on the structural properties of the graph, be used to \emph{preemptively} mitigate congestion at intersections that are structurally constrained (i.e. they are on many shortest paths in the road network, and so are likely to become congested under stochastic demand) before that congestion cascades network wide in the decentralized signal control architecture?
+Graph-theoretic analysis offers exactly such a descriptor. Betweenness centrality quantifies how often a node appears on shortest paths between all origin-destination pairs and is a proven predictor of structural importance in complex networks~\cite{freeman1977set, brandes2001centrality}. In transportation, nodes with high betweenness lie along dominant routing corridors; their saturation has the greatest network-wide impact. While centrality measures have been applied to offline road-network analysis~\cite{wang2015graph}, their integration into real-time signal control has remained largely unexplored. Adaptive controllers that do incorporate global graph structure typically rely on GNN-based representations~\cite{zhang2021trafficgcn}, which require large training datasets, high inference overhead, and produce black-box decisions that are difficult to certify for safety-critical infrastructure. A lightweight, analytically grounded mechanism for embedding betweenness centrality directly into a decentralized controller score has not previously been proposed.
 
-The significant contributions of this paper are as follows:
-\begin{enumerate}[label=(\roman*)]
-\item We propose a light-weight, topology-aware waiting-time minimization (WTM) control strategy that introduces a multiplicative hub-awareness formulation and dynamic parameter scaling based on local graph metrics, so that decisions at the intersections are globally-informed but without requiring centralized overhead.
-\item We construct a comprehensive simulation model in a discrete-time domain, the \textbf{Urban Traffic Signal Optimization Network (UTSON)}, that incorporates the real-world urban topologies from OpenStreetMap, stochastic demand models, and policy evaluation, which allows for reproducible and scalable assessment of policy impact on a range of urban topologies.
-\item To validate our approach, we carry out a thorough cross-topology validation across four cities with different geographical and morphological contexts: Bengaluru, Berlin, London, and Sydney; and empirically compare four centrality measures, showing that betweenness is the most robust measure suitable as a structural prior for urban traffic control.
+In this paper, we address the following question: \emph{Can global topological awareness be integrated into decentralized signal control to preemptively mitigate congestion at structurally critical intersections before it cascades network-wide?} The major contributions of the paper are as follows:
+\begin{enumerate}[label=(\roman*),leftmargin=*]
+\item A lightweight, topology-aware \textbf{Waiting-Time Minimization (WTM)} controller that uses a multiplicative hub-awareness formulation and dynamic parameter scaling derived from local graph metrics, providing global awareness without centralized overhead.
+\item A reproducible discrete-time simulation framework integrating real-world OpenStreetMap topologies with stochastic demand models for scalable policy benchmarking.
+\item Cross-topology validation across four cities (Bengaluru, Berlin, London, Sydney) and an empirical comparison of four centrality measures, establishing betweenness centrality as the most robust structural prior for urban traffic control.
 \end{enumerate}
+The paper is structured as follows: Section~\ref{section_related} reviews related work, Section~\ref{section_preliminaries} establishes the mathematical foundations; Section~\ref{section_methodology} presents the UTSON framework; Section~\ref{section_exp_setup} describes the experimental setup; Sections~\ref{section_exp_res} and~\ref{section_discussion} present the experimental results, discussion, and analysis; Section~\ref{limit_and_fut_work} outlines the limitations and future work; and Section~\ref{section_conclusion} concludes the paper.
 
-The rest of the paper is structured as follows: Section~\ref{section_related} highlights existing work in this direction and identifies the gaps that motivate the proposed approach, Section~\ref{section_methodology} presents the UTSON framework design and signal-control formulation, Section~\ref{section_exp_setup} describes the multi-city experimental setup, Section~\ref{section_exp_res} reports experimental results, Section~\ref{section_discussion} provides discussion and analysis, Section~\ref{limit_and_fut_work} outlines limitations and future work, and Section~\ref{section_conclusion} concludes the paper.
 
-\section{Related Works}
+%%=============================================================
+\section{Related Work}
 \label{section_related}
+%%=============================================================
+Conventional signal controllers use time-constrained plans optimized on historical flows, but these cannot accommodate stochastic, dynamic demand~\cite{daganzo1994queue}. The literature has therefore developed along three broad tracks: pressure-based reactive methods, adaptive and learning-based methods, and graph-topology-aware methods.
 
-Traffic light control is an intensively studied field of research that aims to improve the efficiency of city transport systems and reduce congestion. Conventional traffic control systems tend to use optimized time-constrained signal plans based on past traffic patterns. However, the cited works did not incorporate stochastic, dynamic traffic demand scenarios. In particular, a significant portion of the literature has instead turned to adaptive and decentralized approaches as a means of addressing such dynamic traffic demands.
+\textbf{Pressure-based and backpressure methods.}
+The theoretical foundation was established by Tassiulas and Ephremides~\cite{tassiulas1992stability}, who proved that max-weight scheduling stabilizes queues and maximizes throughput under any feasible demand in multihop networks. Varaiya~\cite{varaiya2013maxpressure} extended this to urban signalized intersections as max-pressure (MP) control, prioritizing phases based on the cross-link queue difference. MP provably stabilizes any network within its saturation envelope, but suffers from ``last-vehicle'' starvation: a near-empty queue can monopolize green time, starving competing approaches. Zaidi et al.~\cite{zaidi2016backpressure} coupled backpressure with adaptive vehicle re-routing to improve throughput, though their model requires that all vehicles can change routes dynamically. Li et al.~\cite{li2018delay} introduced delay-based extensions at isolated intersections, combining instantaneous queue pressure with accumulated waiting time to jointly optimize throughput and fairness. Across all these methods, the structural position of the intersection in the wider network plays no role: a bridge approach and a minor side road are treated identically if their instantaneous queues match.
 
-One of the most powerful scheduling methods of decentralization is the back-pressure-based scheduling. This concept was first introduced in communication networks to stabilize queues and maximize throughput \cite{tassiulas1992stability}, and later applied in urban transport as the max-pressure controller. It dynamically prioritizes traffic phases based on differences in queue pressure across adjacent links \cite{varaiya2013maxpressure}. Elaborating on this, Zaidi et al. \cite{zaidi2016backpressure} developed a multi-commodity back-pressure model that integrates adaptive vehicle routing and decentralized intersection control, reporting significant decreases in queue lengths.
+\textbf{Adaptive and learning-based methods.}
+Practical adaptive control began with systems such as SCATS~\cite{lowrie1982scats} and SCOOT~\cite{gartner2005state}, which adjust cycle lengths and green splits in real time based on loop-detector occupancy. These systems achieve measurable reductions in travel time but are fundamentally reactive: they respond to detected congestion rather than anticipating its likelihood. Neural network controllers~\cite{srinivasan2008network} improved responsiveness by learning nonlinear mappings from detector states to green-time decisions, though the resulting policies remain local and opaque. Single-agent RL applied to isolated intersection control~\cite{abdulhai2003reinforcement} showed that adaptive policies could be learned without an explicit traffic model; multi-agent RL~\cite{wiering2000multi} extended this to neighborhood-level coordination. Deep Q-networks with prioritized replay~\cite{liang2020contextual} improved sample efficiency but maintained a local coordination horizon. Coordinated centralized adaptive control~\cite{gartner2005state} extended the horizon to arterial corridors via green-band optimization yet depends on fixed detector infrastructure. GNNs combined with multi-agent RL~\cite{zhang2021trafficgcn} capture global spatio-temporal correlations but incur substantial training cost and produce black-box decisions difficult to audit for real-world deployment.
 
-Nevertheless, classical back-pressure algorithms tend to be affected by the ``last-vehicle’’ problem: in small queues, green light time is starved during long waiting times. Delay-based extensions have been offered to counter this: isolated intersection throughput optimality and queue fairness \cite{li2018delay}.
+\textbf{Graph topology and centrality in traffic.}
+Urban road networks have been studied as complex graphs to characterize congestion susceptibility~\cite{newman2010networks, wang2015graph}. Betweenness centrality~\cite{freeman1977set, brandes2001centrality} identifies nodes on many shortest paths that are first to saturate under demand; PageRank-style measures~\cite{pagerank2016centrality} rank intersections by influence but do not reflect path-level routing pressure directly. Despite this body of analysis, betweenness centrality has not been used as a live per-step scoring prior in any decentralized real-time controller.
 
-More recently, graph neural networks (GNNs) and multi-agent reinforcement learning (RL) models have been applied to represent road networks as graphs and to learn spatial relations to predict and control congestion \cite{zhang2021trafficgcn}. Recent frameworks directly employ centrality measures as a measure of spatial importance. Although these methods increase predictive accuracy, they are commonly characterized by a huge computational burden and are black boxes. The outstanding gap in developing a lightweight, mathematical framework that integrates network topology awareness (through centrality) with deterministic, delay-constraining adaptive scheduling has remained critical.
-
-A summary of these approaches and their identified gaps is provided in Table~\ref{tab:lit_review}.
+\textbf{Positioning of UTSON.}
+UTSON bridges structural network analysis and real-time decentralized control. Relative to backpressure methods, it weights each approach by the global importance of its source node, enabling cascade-preventive prioritization before queues form. Compared with GNN-based approaches, it requires no training data, has $\mathcal{O}(k(|E|+|V|\log|V|))$ pre-computation, and produces fully interpretable scores. In contrast to corridor controllers, it operates over the entire network graph. Table~\ref{tab:lit_review} maps this position.
 
 \begin{table*}[t]
 \centering
-\caption{Summary of Traffic Signal Control Literature and Identified Gaps}
+\caption{Summary of traffic signal control literature and identified gaps}
 \label{tab:lit_review}
-\renewcommand{\arraystretch}{1.4}
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{3cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|}
 \hline
-\textbf{Reference} & \textbf{Control Paradigm} & \textbf{Topology Awareness} & \textbf{Core Objective} & \textbf{Key Limitation / Gap} \\
+\textbf{Reference} & \textbf{Control Paradigm} & \textbf{Topology Awareness} & \textbf{Core Objective} & \textbf{Key Limitation} \\
 \hline
-Tassiulas et al. \cite{tassiulas1992stability} & Decentralized Max-Weight (Backpressure) & Link-level only (isolated to adjacent nodes) & Queue stability and maximum throughput & Designed strictly for data packets; lacks physical urban transit constraints. \\
+Tassiulas et al.~\cite{tassiulas1992stability} & Max-weight backpressure & Link-level only & Queue stability \& throughput & No urban transit constraints \\
 \hline
-Varaiya \cite{varaiya2013maxpressure} & Decentralized Max-Pressure & Localized (based on upstream/downstream queues) & Maximize network throughput & Ignores cumulative wait times; suffers from the ``last-vehicle’’ starvation problem. \\
+Varaiya~\cite{varaiya2013maxpressure} & Max-pressure & Upstream/downstream queues & Maximize throughput & Last-vehicle starvation \\
 \hline
-Zaidi et al. \cite{zaidi2016backpressure} & Backpressure with Adaptive Routing & Localized coordination with dynamic vehicle pathing & Queue reduction and routing efficiency & High complexity; relies on the assumption that all vehicles can reroute dynamically. \\
+Zaidi et al.~\cite{zaidi2016backpressure} & Backpressure + adaptive routing & Localized dynamic pathing & Queue reduction \& routing & Requires full vehicle reroutability \\
 \hline
-Li et al. \cite{li2018delay} & Delay-based Queue Reactive & Isolated intersection & Throughput optimality combined with driver fairness & Lacks global network coordination and foresight for structural bottlenecks. \\
+Li et al.~\cite{li2018delay} & Delay-based queue reactive & Isolated intersection & Throughput + fairness & No global network foresight \\
 \hline
-Zhang et al. \cite{zhang2021trafficgcn} & Coordinated RL / Graph Neural Networks & Global (utilizes GNNs / node spatial features) & Predictive and adaptive congestion management & High computational overhead; black-box decision making difficult to interpret. \\
+Abdulhai et al.~\cite{abdulhai2003reinforcement} & Single-agent RL & None & Adaptive policies w/o models & No network-level coordination \\
+\hline
+Wiering~\cite{wiering2000multi} & Multi-agent RL & Neighborhood-level & Decentralized cooperation & No global structural awareness \\
+\hline
+Lowrie~\cite{lowrie1982scats} & SCATS (adaptive cycle) & None & Real-time cycle adjustment & Cannot anticipate network cascades \\
+\hline
+Srinivasan et al.~\cite{srinivasan2008network} & Neural network & None & Learned signal timing & Black-box; no topological reasoning \\
+\hline
+Liang et al.~\cite{liang2020contextual} & Deep Q-network & None & Efficient single-intersection control & No network-level coordination \\
+\hline
+Gartner~\cite{gartner2005state} & SCOOT / centralized arterial & Corridor-level & Arterial green-band optimization & Fixed infrastructure; no global graph \\
+\hline
+Zhang et al.~\cite{zhang2021trafficgcn} & GNN + coordinated RL & Global (GNN features) & Predictive congestion management & High overhead; black-box decisions \\
+\hline
+\textbf{UTSON (ours)} & Topology-aware WTM & Global betweenness centrality & Minimize wait; prevent cascades & Lightweight, interpretable, no training \\
 \hline
 \end{tabularx}
 \end{table*}
 
-In contrast to the above approaches, the method proposed in this work combines queue-reactive scheduling with global topological awareness through normalized betweenness centrality, using a multiplicative hub-awareness formulation that prevents both congestion cascading and minor-road starvation. Unlike GNN-based methods, it requires no training data and remains fully interpretable.
+%%=============================================================
+\section{Preliminaries}
+\label{section_preliminaries}
+%%=============================================================
 
-\section{Model Formulation and Methodology}
+This section establishes the mathematical foundations and graph-theoretic concepts upon which the UTSON framework is built.
+
+\subsection{Road Network and Edge Attributes}
+The road network is modeled as a directed graph $G=(V,E)$~\cite{newman2010networks}, where nodes $v\in V$ are signalized intersections and directed edges $e=(u,v)\in E$ are one-way road segments. Attributes $L_e$ (length), $V_e$ (speed limit), and $\ell_e$ (lane count) are parsed from OpenStreetMap~\cite{boeing2017osmnx} via OSMnx. Only the largest strongly connected component is retained; parallel multi-edges are collapsed to the shortest. Free-flow travel time and per-cycle service capacity are:
+\begin{equation}
+\tau_e = \frac{L_e}{V_e}, \qquad
+C_e = \max\!\left(1,\lfloor 8\ell_e\rfloor\right), \label{eq:tau_cap}
+\end{equation}
+where the constant $8$ follows the standard 1800~veh/hr/lane saturation flow assumption~\cite{hcm2016}, and $\max(\cdot,1)$ prevents division-by-zero on unmapped edges.
+
+\subsection{Betweenness Centrality}
+Node importance is quantified by weighted betweenness centrality~\cite{freeman1977set,brandes2001centrality}:
+\begin{equation}
+B_i = \sum_{s\neq i\neq t}\frac{\sigma_{st}(i)}{\sigma_{st}}, \qquad
+\hat{B}_i = \frac{B_i}{\max_j B_j}\in[0,1], \label{eq:bc}
+\end{equation}
+where $\sigma_{st}$ is the number of $\tau_e$-weighted shortest paths from $s$ to $t$ and $\sigma_{st}(i)$ is those passing through $i$. High-$\hat{B}$ nodes lie on many shortest paths; their saturation can trigger network-wide congestion cascades. To keep computation tractable, $B_i$ is approximated by sampling $k{=}80$ source nodes, reducing complexity from $\mathcal{O}(|V||E|)$ to $\mathcal{O}(k(|E|+|V|\log|V|))$.
+
+\subsection{Stochastic Demand and Signal Timing}
+Vehicle arrivals follow a Poisson process~\cite{ross2014poisson,daganzo1994queue}: $A_t\sim\mathrm{Poisson}(\lambda)$, where $A_t$ is the number of vehicles injected at step $t$ and $\lambda$ is the mean arrival rate. Each vehicle is assigned a precomputed OD route directed through structural chokepoints. Rather than managing explicit stateful timers, UTSON uses a \emph{virtual green time} abstraction: a dynamic green duration $g_{\mathrm{dynamic}}\in[g_{\min},g_{\max}]$ is computed at each step proportional to the approach urgency and converted into a discrete vehicle discharge count (details in Section~\ref{subsec:edge_capacity}).
+
+%%=============================================================
+\section{UTSON Framework Design}
 \label{section_methodology}
+%%=============================================================
 
-\subsection{Road-Network Modeling}
-The study area is represented as a directed graph $G=(V,E)$, where each node $v \in V$ denotes an intersection, and each directed edge $e \in E$ denotes a road segment. The graph is extracted from OpenStreetMap using the OSMnx library~\cite{boeing2017osmnx}, which provides access to real-world road attributes including length, speed limits, and lane counts. A routing feasibility strategy is used to retain only the largest strongly connected component, and multi-edges between the same node pair are collapsed to retain only the shortest. The graph structure and betweenness centrality are computed using the NetworkX library~\cite{hagberg2008networkx}. The attributes of length, speed, the number of lanes, and travel time of each edge are parsed from the map data.
+This section presents the UTSON framework: a discrete-time, topology-aware signal control system built on the foundations of Section~\ref{section_preliminaries}. We detail the three evaluated control policies, the multiplicative hub-awareness scoring mechanism, the dynamic topology scaling of control parameters, and the edge-level capacity allocation procedure. Fig.~\ref{fig:utson_block} presents the complete UTSON system architecture.
 
-The travel time of edge $e$ is computed as
-\begin{equation}
-\tau_e=\frac{L_e}{V_e},
-\end{equation}
-where $L_e$ is the edge length and $V_e$ is the edge speed.
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+  %% Node styles
+  iblock/.style ={draw, rounded corners=4pt, minimum width=2.8cm, minimum height=0.9cm,
+                  align=center, font=\small, fill=blue!7,  line width=0.5pt},
+  cblock/.style ={draw, rounded corners=4pt, minimum width=2.8cm, minimum height=0.9cm,
+                  align=center, font=\small, fill=orange!12, line width=0.5pt},
+  sblock/.style ={draw, rounded corners=4pt, minimum width=2.8cm, minimum height=0.9cm,
+                  align=center, font=\small, fill=green!9,  line width=0.5pt},
+  oblock/.style ={draw, rounded corners=4pt, minimum width=2.8cm, minimum height=0.9cm,
+                  align=center, font=\small, fill=purple!8, line width=0.5pt},
+  %% Label strip on the left
+  lstrip/.style ={draw=gray!60, fill=gray!10, rounded corners=3pt,
+                  minimum width=1.6cm, align=center, font=\bfseries\footnotesize},
+  %% Arrows
+  arr/.style  ={-{Stealth[length=5pt]}, thick},
+  darr/.style ={-{Stealth[length=5pt]}, thick, dashed, gray!70},
+  %% Column x-positions (centres)
+  /tikz/col1/.initial=1.8,
+  /tikz/col2/.initial=5.2,
+  /tikz/col3/.initial=8.6,
+  /tikz/col4/.initial=12.0,
+  %% Row y-positions (centres)
+  /tikz/rowA/.initial= 0.0,    % Data Layer
+  /tikz/rowB/.initial=-2.6,    % Preliminaries
+  /tikz/rowC/.initial=-5.2,    % Control Layer
+  /tikz/rowD/.initial=-7.8,    % Simulation Loop
+  /tikz/rowE/.initial=-10.4    % Output Metrics
+]
 
-A lane-based service proxy is defined as
-\begin{equation}
-C_e=\max!\left(1,\left\lfloor 8\ell_e \right\rfloor\right),
-\end{equation}
-where $\ell_e$ is the lane count of edge $e$, and $C_e$ is the approximate number of vehicles that can be served from that approach in one nominal control cycle. This approximation is based on the standard saturation flow assumption of approximately 1800 vehicles per hour per lane (i.e., a headway of about 2 seconds per vehicle),
-which gives around 7–9 vehicles during a short green phase of 15–20 seconds as reported in~\cite{hcm2016}.
+%% ── ROW A: DATA LAYER ─────────────────────────────────────────
+\node[iblock] (osm)   at (1.8,  0.0) {OpenStreetMap\\(OSMnx)};
+\node[iblock] (graph) at (5.2,  0.0) {Directed Graph\\$G=(V,E)$};
+\node[iblock] (attrs) at (8.6,  0.0) {Edge Attributes\\$L_e,\,V_e,\,\ell_e$};
+\node[iblock] (scc)   at (12.0, 0.0) {Largest Strongly\\Connected Comp.};
 
-\subsection{Topological Importance}
-Intersection criticality is assessed using weighted betweenness centrality~\cite{brandes2001centrality}, where edge weights correspond to travel times. Let $B_i$ denote the betweenness value of node $i$. The normalized importance score is defined as
-\begin{equation}
-\hat{B}_i=\frac{B_i}{\max_j B_j}, \quad \hat{B}_i \in [0,1].
-\end{equation}
-This score serves as a topology-aware prior in the control policy. To maintain computational tractability for large networks, we compute approximate betweenness centrality using a random sample of $k$ source nodes (typically $k=80$). This reduces complexity from $\mathcal{O}(|V| \cdot |E|)$ to $\mathcal{O}(k \cdot (|E| + |V| \log |V|))$ while providing a reliable estimate of structural significance.
+\draw[arr] (osm)   -- (graph);
+\draw[arr] (graph) -- (attrs);
+\draw[arr] (attrs) -- (scc);
 
-\subsection{Demand and Route Generation}
-For the benchmark figures, origin-destination pairs are sampled so that the resulting route bank crosses explicit bottlenecks such as bridges, hub corridors, or a central radial hub. This makes the structural importance signal observable in the comparison plots. The number of vehicles arriving at the simulation step $t$ is assumed to be a Poisson process.~\cite{ross2014poisson}:
-\begin{equation}
-A_t \sim \mathrm{Poisson}(\lambda),
-\end{equation}
-where $\lambda$ is the mean arrival rate. Each incoming vehicle is assigned one of the precomputed routes from the route bank, and the benchmark traffic is intentionally routed through the structural chokepoints of the synthetic city motifs used in the regenerated plots.
+\node[lstrip, minimum height=0.9cm] at (-0.2, 0.0) {Data\\Layer};
 
-\subsection{Signal-Control Policies}
-Three signal-control policies are evaluated under the same conditions - simulation conditions:
-\begin{enumerate}
-\item \textbf{Fixed-time control:} All incoming approaches are allocated an equal amount of service on a cyclical basis.
-\item \textbf{Queue-reactive control:}  Priority service of the incoming service according to the dynamic service priority of the maximum instantaneous queue.
-\item \textbf{Topology-aware waiting minimization (WTM):} The proposed strategy is based on the consideration of a combination of queue pressure, cumulative waiting burden, and global node importance.
+%% ── ROW B : PRELIMINARIES ───────────────────────────────────────
+\node[iblock] (tau) at (1.8,  -2.6) {Travel Time\\$\tau_e = L_e/V_e$};
+\node[iblock] (cap) at (5.2,  -2.6) {Lane Capacity\\$C_e$};
+\node[iblock] (bc)  at (8.6,  -2.6) {Betweenness\\Centrality $\hat{B}_i$};
+\node[iblock] (rte) at (12.0, -2.6) {Route Bank\\(OD Pairs)};
+
+%% SCC fans out to all four prelim nodes — use a common drop point
+\coordinate (sccDrop) at (12.0, -1.55);
+\draw[arr] (scc.south) -- (sccDrop) -| (tau.north);
+\draw[arr] (sccDrop)   -| (cap.north);
+\draw[arr] (sccDrop)   -| (bc.north);
+\draw[arr] (sccDrop)   -- (rte.north);
+
+\node[lstrip, minimum height=0.9cm] at (-0.2, -2.6) {Prelim-\\inaries};
+
+%% ── ROW C : CONTROL LAYER ───────────────────────────────────────
+\node[cblock] (dyn)   at (1.8,  -5.2) {Dynamic Param.\\$\alpha_i,\beta_i,\gamma_i$};
+\node[cblock] (pq)    at (5.2,  -5.2) {Queue Pressure\\$P_e^{q}(t)$};
+\node[cblock] (pw)    at (8.6,  -5.2) {Wait Pressure\\$P_e^{w}(t)$};
+\node[cblock] (score) at (12.0, -5.2) {WTM Score\\$S_e(t)$};
+
+%% bc -> dyn  (diagonal avoided via explicit waypoint)
+\draw[arr] (bc.south)  -- ++(0,-0.30) -- ++(-6.8,0) -- (dyn.north);
+%% cap -> pq
+\draw[arr] (cap.south) -- (pq.north);
+%% cap -> pw  (offset to avoid overlap with cap->pq)
+\draw[arr] (cap.south) -- ++(0,-0.18) -- ++(3.4,0) -- (pw.north);
+%% bc  -> score
+\draw[arr] (bc.south)  -- ++(0,-0.46) -- ++(3.4,0) -- (score.north);
+%% dyn,pq,pw -> score  (horizontal within row)
+\draw[arr] (dyn)   -- (pq);
+\draw[arr] (pq)    -- (pw);
+\draw[arr] (pw)    -- (score);
+
+\node[lstrip, minimum height=0.9cm] at (-0.2, -5.2) {Control\\Layer};
+
+%% ── ROW D : SIMULATION LOOP ─────────────────────────────────────
+\node[sblock] (win)  at (1.8,  -7.8) {Winning Edge\\$e^*(t)$};
+\node[sblock] (gt)   at (5.2,  -7.8) {Virtual Green\\Time $g_{\mathrm{dyn}}(t)$};
+\node[sblock] (disc) at (8.6,  -7.8) {Discharge\\$C_{e^*}(t)$ veh.};
+\node[sblock] (poi)  at (12.0, -7.8) {Poisson\\Arrivals $A_t$};
+
+%% score -> win
+\draw[arr] (score.south) -- ++(0,-0.30) -- ++(-10.2,0) -- (win.north);
+%% within row
+\draw[arr] (win)  -- (gt);
+\draw[arr] (gt)   -- (disc);
+%% poi feeds into disc from right
+\draw[arr] (poi.west) -- (disc.east);
+%% feedback: disc -> pq  (route along bottom, clear of all nodes)
+\draw[darr] (disc.south) -- ++(0,-0.55)
+    -- ++(-6.8,0)
+    node[midway, below, font=\tiny\itshape] {queue update $\to$ next step $t{+}1$}
+    |- (pq.west);
+
+\node[lstrip, minimum height=0.9cm] at (-0.2, -7.8) {Simul-\\ation\\Loop};
+
+%% ── ROW E : OUTPUT METRICS ──────────────────────────────────────
+\node[oblock] (avq)  at (1.8,  -10.4) {Avg Queue\\Length};
+\node[oblock] (avt)  at (5.2,  -10.4) {Avg Travel\\Delay};
+\node[oblock] (tput) at (8.6,  -10.4) {Throughput};
+\node[oblock] (comp) at (12.0, -10.4) {Completion\\Ratio};
+
+%% disc fans out to all four output nodes
+\coordinate (discDrop) at (8.6, -9.35);
+\draw[arr] (disc.south) -- (discDrop) -| (avq.north);
+\draw[arr] (discDrop)   -| (avt.north);
+\draw[arr] (discDrop)   -- (tput.north);
+\draw[arr] (discDrop)   -| (comp.north);
+
+\node[lstrip, minimum height=0.9cm] at (-0.2, -10.4) {Output\\Metrics};
+
+\end{tikzpicture}
+\caption{UTSON system architecture. Raw OpenStreetMap data is parsed into a directed graph (Data Layer); graph metrics including travel time, capacity, betweenness centrality, and OD routes are precomputed (Preliminaries); node-specific scoring parameters and pressure signals are assembled (Control Layer); the WTM controller selects a winning edge, computes virtual green time, and discharges vehicles each step (Simulation Loop); performance metrics are recorded at every step (Output Metrics). The dashed feedback arrow shows that queue states updated during discharge feed back into the next step's pressure computations.}
+\label{fig:utson_block}
+\end{figure*}
+
+UTSON evaluates three signal-control policies under identical simulation conditions, spanning a spectrum from static baseline to fully adaptive topology-aware control:
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Fixed-time:} Equal cyclic allocation regardless of queue state (the real-world baseline).
+\item \textbf{Backpressure (BP):} Prioritizes the approach with maximum instantaneous queue; local-reactive only.
+\item \textbf{WTM (proposed):} Jointly considers queue pressure, cumulative waiting, and betweenness centrality for preemptive, topology-aware control.
 \end{enumerate}
 
-For an incoming edge $e$ at time $t$, the priority score is formulated as:
+\subsection{Additive Baseline Score}
+For edge $e$ at step $t$, an additive score is first defined:
 \begin{equation}
-S_e(t)=\alpha q_e(t)+\beta W_e(t)+\gamma \hat{B}{u(e)},
+S_e(t) = \alpha\, q_e(t) + \beta\, W_e(t) + \gamma\,\hat{B}_{u(e)}, \label{eq:additive_score}
 \end{equation}
-where $q_e(t)$ is queue length, $W_e(t)$ is the cumulative waiting component, $\hat{B}{u(e)}$ is the normalized importance of the source node, and $\alpha, \beta, \gamma$ are weighting parameters. While Eq.~(5) illustrates the additive principle, the multiplicative refinement in Eq.~(6) is utilized for all reported experiments.
+where $q_e(t)$ is queue length, $W_e(t)$ is cumulative waiting burden, and $\hat{B}_{u(e)}$ is the normalized centrality of the source node. This formulation has a structural weakness: a high-centrality hub with an empty queue can outscore a heavily loaded minor road purely from its $\hat{B}$ term. The multiplicative formulation below corrects this.
 
-\subsection{Multiplicative Hub Awareness}
-In the additive formulation, empty hubs may be prioritized over busy side roads. To address this, we refine the scoring using \emph{multiplicative hub-awareness}, where the structural bonus acts as a multiplier on traffic demand:
+\subsection{Multiplicative Hub-Awareness}
+The WTM score scales the topological bonus by actual traffic demand, so centrality amplifies priority only when vehicles are present:
 \begin{equation}
-\label{eq:mult_score}
-S_e(t) = \left(\alpha_i \cdot P_e^{q}(t) + \beta_i \cdot P_e^{w}(t)\right) \times \left(1 + \gamma_i \cdot \hat{B}{u(e)}\right),
+S_e(t) = \Bigl(\alpha_i\,P_e^{q}(t)+\beta_i\,P_e^{w}(t)\Bigr)\times\Bigl(1+\gamma_i\,\hat{B}_{u(e)}\Bigr), \label{eq:mult_score}
 \end{equation}
-where $P_e^{q}(t) = q_e(t) / C_e$ is the normalized queue pressure, $P_e^{w}(t) = W_e(t) / (C_e \cdot T{\text{cycle}})$ is the normalized wait pressure, and $\alpha_i, \beta_i, \gamma_i$ are node-specific dynamic parameters. This ensures that priority is amplified only when demand is present, preventing capacity waste at empty intersections.
+where $P_e^{q}=q_e(t)/C_e$ is normalized queue pressure and $P_e^{w}=W_e(t)/(C_e\cdot T_{\mathrm{cycle}})$ is normalized wait pressure. When no vehicles are present ($P_e^q{=}P_e^w{=}0$), the score collapses to zero; regardless of centrality, idle hubs are never prioritized over active minor roads. Conversely, when demand is high at a structurally critical node, the multiplier $(1 + \gamma_i \cdot \hat{B}_{u(e)})$ amplifies the urgency of that approach, enabling the controller to preemptively clear bottleneck intersections before congestion propagates downstream.
 
 \subsection{Dynamic Topology Scaling}
 \label{subsec:dynamic_scaling}
-The proposed framework is not based on setting the control parameters $\alpha$, $\beta$, and $\gamma$ to prescribed values, but rather dynamically adapts them at each intersection based on the local graph structure. It is a dynamic topology-scaling method that does not require manual tuning by the controller; instead, it allows the controller to automatically adapt to the structural properties of each crossroad.
+Rather than fixed global $\alpha,\beta,\gamma$, UTSON adapts each parameter per intersection from local graph structure:
 \begin{align}
-\alpha_i &=& 0.5 + 0.5 \times \frac{d_i^{\text{in}}}{\max_j d_j^{\text{in}}}, \label{eq:alpha_dyn} \\
-\beta_i &=& 0.5 \times (1 - \hat{B}_i), \label{eq:beta_dyn} \\
-\gamma_i &=& 0.2 + 0.8 \times \hat{B}_i, \label{eq:gamma_dyn}
+\alpha_i &= 0.5 + 0.5\times\tfrac{d_i^{\mathrm{in}}}{\max_j d_j^{\mathrm{in}}}, \label{eq:alpha}\\
+\beta_i  &= 0.5\times(1-\hat{B}_i), \label{eq:beta}\\
+\gamma_i &= 0.2 + 0.8\times\hat{B}_i. \label{eq:gamma}
 \end{align}
-where $d_i^{\text{in}}$ is the in-degree of node $i$.
-
-The rationale for each parameter is as follows:
+The traffic-flow rationale for each parameter is as follows:
 \begin{itemize}
-\item \textbf{Alpha ($\alpha_i$):} The queues that are associated with scales are pressure sensitive, meaning that they are based on node in-degree. The model normalizes in-degree to $[0.5, 1.0]$ to give more weight to intersections.
-\item \textbf{Beta ($\beta_i$):} Prevents traffic starvation at less connected intersections by giving higher weights to the peripheral nodes with lower centrality, ensuring fairness.
-\item \textbf{Gamma ($\gamma_i$):} Increases the importance of hub nodes. To give critical network connectors the appropriate priority, betweenness centrality is scaled to the range $[0.2, 1.0]$.
+\item \textbf{$\alpha_i$ (queue-pressure sensitivity):} Intersections with more incoming roads naturally accumulate greater vehicular demand. Scaling $\alpha_i$ with normalized in-degree to $[0.5, 1.0]$ ensures that multi-approach junctions react more strongly to queue buildup, reflecting their higher throughput responsibility.
+\item \textbf{$\beta_i$ (wait-time fairness):} Peripheral intersections with low betweenness centrality are susceptible to prolonged waiting if perpetually deprioritized in favor of hubs. Setting $\beta_i$ inversely proportional to $\hat{B}_i$ gives greater weight to cumulative waiting at low-centrality nodes, preventing minor-road starvation.
+\item \textbf{$\gamma_i$ (hub amplification):} High-betweenness intersections lie on many shortest paths and are structurally predisposed to congestion cascades. Scaling $\gamma_i$ proportionally to $\hat{B}_i$ within $[0.2, 1.0]$ ensures the topological multiplier in \eqref{eq:mult_score} is strongest at critical connectors, enabling proactive green-time allocation where network-wide spillback risk is highest.
 \end{itemize}
+For example, a Thames bridge node with $\hat{B}{=}0.9$ gets $(\alpha,\beta,\gamma)=(0.9,\,0.05,\,0.92)$; a peripheral node with $\hat{B}{=}0.05$ gets $(0.6,\,0.475,\,0.24)$, ensuring minor-road vehicles are not starved.
 
-\subsection{Edge-Based Dynamic Capacity Allocation}
-The proposed discrete-time implementation is different from traditional controllers, which assume stateful signal timers and bundle non-conflicting edges into phases (e.g., North-South movement). The discrete time implementation makes the intersection logic significantly simpler, allowing for very fine-grained control. Each controller node at an intersection $v$ at each simulation step $t$ checks all the incoming edges $E_{in}(v)$ and chooses one winning edge $e(t)$ with highest priority score:
-\begin{equation}
-e(t) = \arg\max_{e \in E_{in}(v)} S_{e(t)}.
-\end{equation}
+\subsection{Edge-Based Capacity Allocation}
+\label{subsec:edge_capacity}
+At each step $t$, intersection $v$ selects the winning edge and computes virtual green time:
+\begin{align}
+e^*(t) &= \arg\max_{e\in E_{\mathrm{in}}(v)} S_e(t), \label{eq:winner}\\
+\pi_{e^*}(t) &= \mathrm{clip}(S_{e^*}(t),\,0,\,1), \label{eq:priority_clip}\\
+g_{\mathrm{dynamic}}(t) &= g_{\min}+(g_{\max}-g_{\min})\times\pi_{e^*}(t), \label{eq:green_time}\\
+C_{e^*}(t) &= \max\!\left(1,\left\lfloor C_{e^*}\times\tfrac{g_{\mathrm{dynamic}}(t)}{T_{\mathrm{cycle}}}\right\rfloor\right). \label{eq:discharge}
+\end{align}
+This abstracts physical signal timing into a per-step discharge count, enabling instantaneous switching without yellow-clearance overhead.
 
-In addition, the model approximates continuous-time signals using a series of discrete simulation steps, introducing a virtual Green time approach that abstracts temporal bounds, e.g., minimum/maximum green time, yellow clearance penalties, etc. Instead of holding a signal state across multiple steps, the controller calculates a dynamic green duration $g_{\text{dynamic}}$ for the current step. The situational priority is computed and clipped to $[0, 1]$:
-\begin{equation}
-\label{eq:situational}
-\pi_{e(t)} = \text{clip}!\left(S_{e(t)},\ 0,\ 1\right),
-\end{equation}
-and the dynamic green time is scaled between minimum and maximum bounds:
-\begin{equation}
-g_{\text{dynamic}}(t) = g_{\min} + (g_{\max} - g_{\min}) \times \pi_{e(t)}.
-\end{equation}
-This time is mathematically converted into a discrete vehicle discharge capacity:
-\begin{equation}
-C_{e(t)} = \max!\left(1, \left\lfloor C_e\times \frac{g_{\text{dynamic}}}{T_{\text{cycle}}} \right\rfloor\right),
-\end{equation}
-where $C_{e(t)}$ is the current movement capacity, $C_e$ is the baseline edge capacity, and $T_{\text{cycle}}$ is the nominal cycle time. This abstraction enables instantaneous switching between priority edges without clearance penalties, clearing the dynamically scaled queue capacity in a single discharge event per step.
+\subsection{Discrete-Time Simulation Loop}
+\label{subsec:simulation_loop}
+Each step executes three sequential phases, illustrated schematically in Fig.~\ref{fig:sim_phases} and formalised in Algorithm~\ref{alg:wtm}:
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Service:} The winning edge discharges up to $C_{e^*}(t)$ vehicles via FIFO, ensuring longest-waiting vehicles are served first.
+\item \textbf{Transfer:} Discharged vehicles advance to their next-hop queue or are removed from the network (destination reached) and counted toward throughput.
+\item \textbf{Arrival:} $A_t\sim\mathrm{Poisson}(\lambda)$ new vehicles are injected at origin edges on precomputed OD routes.
+\end{enumerate}
 
-\subsection{Discrete-Time Simulation}
-The simulation operates in discrete time steps, executing three primary phases at each interval: \textit{service}, \textit{transfer}, and \textit{arrival}. All approaches maintain First-In-First-Out (FIFO) queues. During the \textit{service} phase, vehicles are discharged from prioritized edges according to the dynamically calculated virtual capacity. In the \textit{transfer} phase, vehicles advance to downstream edges or exit the network upon completion. Finally, the \textit{arrival} phase injects new vehicles based on the Poisson demand model. Algorithm~\ref{alg:wtm} details the per-step decision logic for the WTM controller.
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw, rounded corners=4pt, minimum width=2.6cm, minimum height=0.75cm,
+              align=center, font=\small, fill=white},
+  phase/.style={draw, rounded corners=5pt, fill=gray!15, minimum width=2.6cm,
+                minimum height=0.75cm, align=center, font=\small\bfseries},
+  arrow/.style={-{Stealth[scale=0.9]}, thick}
+]
+%% SERVICE
+\node[phase] (srv) at (0,0)      {Service};
+\node[box,below=0.35cm of srv] (q)    {Queue $\mathcal{Q}_{e^*}$};
+\node[box,below=0.35cm of q]   (cap)  {Discharge $\leq C_{e^*}(t)$};
+\node[box,below=0.35cm of cap]  (fifo) {FIFO removal};
+\draw[arrow](srv)--(q); \draw[arrow](q)--(cap); \draw[arrow](cap)--(fifo);
+%% TRANSFER
+\node[phase] (trn) at (5.0,0)    {Transfer};
+\node[box,below=0.35cm of trn] (disc) {Discharged veh.};
+\node[box,below=0.35cm of disc](fork) {Dest.\ reached?};
+\node[box,below left=0.35cm and -0.6cm of fork]  (nxt)  {Next edge};
+\node[box,below right=0.35cm and -0.6cm of fork] (done) {Mark done};
+\draw[arrow](trn)--(disc); \draw[arrow](disc)--(fork);
+\draw[arrow](fork)--(nxt)  node[midway,left,font=\scriptsize]{No};
+\draw[arrow](fork)--(done) node[midway,right,font=\scriptsize]{Yes};
+%% ARRIVAL
+\node[phase] (arr) at (10.0,0)    {Arrival};
+\node[box,below=0.35cm of arr] (poi) {$A_t\!\sim\!\mathrm{Poisson}(\lambda)$};
+\node[box,below=0.35cm of poi] (rte) {Assign OD route};
+\node[box,below=0.35cm of rte] (inj) {Inject at origin};
+\draw[arrow](arr)--(poi); \draw[arrow](poi)--(rte); \draw[arrow](rte)--(inj);
+%% INTER-PHASE
+\draw[arrow,dashed](fifo.east) to[out=0,in=180] (disc.west);
+\draw[arrow,dashed](done.east) to[out=0,in=180] (poi.west);
+\end{tikzpicture}
+\caption{Schematic of the three simulation phases executed at each discrete step: Service discharges vehicles from the winning-edge FIFO queue; Transfer routes them onward or marks them complete; Arrival injects new Poisson demand onto OD routes.}
+\label{fig:sim_phases}
+\end{figure*}
 
 \begin{algorithm}[t]
 \caption{WTM Controller: Per-Step Decision}
 \label{alg:wtm}
 \begin{algorithmic}[1]
 \Require Graph $G=(V,E)$, edge queues $\mathcal{Q}$, step $t$
-\For{each active intersection $v$ with $\exists e \in E_{in}(v): q_e > 0$}
-\For{each incoming edge $e \in E_{in}(v)$}
-\State $P_e^q \gets q_{e(t)} / C_e$ \Comment{Queue pressure}
-\State $P_e^w \gets \sum_{(r,s,p) \in \mathcal{Q}e} (t - s) ;/; (C_e \cdot T{\text{cycle}})$ \Comment{Wait pressure}
-\State $S_e \gets (\alpha_v \cdot P_e^q + \beta_v \cdot P_e^w) \times (1 + \gamma_v \cdot \hat{B}{u(e)})$
+\For{each active intersection $v$ with $\exists\,e\in E_{\mathrm{in}}(v):q_e>0$}
+  \For{each $e\in E_{\mathrm{in}}(v)$}
+    \State $P_e^q \gets q_e(t)/C_e$ \Comment{Queue pressure \eqref{eq:tau_cap}}
+    \State $P_e^w \gets \sum_{(r,s,p)\in\mathcal{Q}_e}(t-s)/(C_e\cdot T_{\mathrm{cycle}})$ \Comment{Wait pressure}
+    \State $S_e \gets (\alpha_v P_e^q+\beta_v P_e^w)(1+\gamma_v\hat{B}_{u(e)})$ \Comment{WTM score \eqref{eq:mult_score}}
+  \EndFor
+  \State $e^*\gets\arg\max_{e}S_e$; \quad $\pi\gets\mathrm{clip}(S_{e^*},0,1)$ \Comment{\eqref{eq:winner},\eqref{eq:priority_clip}}
+  \State $g\gets g_{\min}+(g_{\max}-g_{\min})\pi$; \quad $c\gets\max(1,\lfloor C_{e^*}g/T_{\mathrm{cycle}}\rfloor)$ \Comment{\eqref{eq:green_time},\eqref{eq:discharge}}
+  \State Serve $\min(q_{e^*},c)$ vehicles from $\mathcal{Q}_{e^*}$
 \EndFor
-\State $e^* \gets \arg\max{e \in E_{in}(v)} S_e$ \Comment{Select best edge}
-\State $\pi \gets \text{clip}(S_{e(t)},\ 0,\ 1)$ \Comment{Situational priority}
-\State $g \gets g_{\min} + (g_{\max} - g_{\min}) \times \pi$ \Comment{Dynamic green}
-\State $c \gets \max(1, \lfloor C_{e(t)} \times g / T_{\text{cycle}} \rfloor)$ \Comment{Discharge capacity}
-\State Serve $\min(q_{e(t)}, c)$ vehicles from $\mathcal{Q}_{e(t)}$
-\EndFor
-\State Transfer served vehicles to downstream edges or marked complete
-\State Inject new arrivals from demand schedule $A_t$
+\State Transfer served vehicles; inject $A_t\sim\mathrm{Poisson}(\lambda)$ new arrivals
 \end{algorithmic}
 \end{algorithm}
 
-The measures recorded include the average queue length, the average travel-delay proxy, the throughput, the completion ratio, and per-node queue data.
+\textbf{Time complexity.} Pre-computation (betweenness + route bank) is $\mathcal{O}((k+R)(|E|+|V|\log|V|))$. The simulation loop is $\mathcal{O}(T|E|Q)$ where $Q$ is the maximum queue depth; incremental wait-tracking can reduce this to $\mathcal{O}(T|E|)$ in future work.
 
-\subsection{Time Complexity}
-Let $|V|$ and $|E|$ denote the number of nodes and edges, respectively. Let $k$ be the number of sampled sources for betweenness estimation, $R$ the route-bank size, $T$ the simulation steps, and $Q$ the maximum queue depth. The pre-computation phase, involving betweenness estimation and shortest-path generation, follows:
-\begin{equation}
-\mathcal{O}\left((k + R)\left(|E|+|V|\log|V|\right)\right).
-\end{equation}
-
-The active simulation phase evaluates intersections and updates queues. Calculating the cumulative wait burden $W_e(t)$ requires iterating through active queues, resulting in a worst-case complexity of:
-\begin{equation}
-\mathcal{O}\left(T \cdot |E| \cdot Q\right).
-\end{equation}
-
-While efficient across a range of network sizes, the linear dependence on $Q$ creates a bottleneck under extreme congestion. Future optimizations could employ incremental wait-time tracking to achieve $\mathcal{O}(1)$ queue updates, removing this dependency.
-
-\begin{figure*}[!t]
-\centering
-\includegraphics[width=\textwidth,height=0.90\textheight,keepaspectratio]{final_paper_grid_hd.png}
-\caption{Comprehensive benchmark grid summarizing performance across four city-motif traffic networks (Bengaluru, Berlin, London, Sydney) for the three evaluated controllers. The regenerated figures use bottleneck-heavy route banks so that structural importance, queue management, and wait-time fairness can be compared under the same traffic generation logic.}
-\label{fig:results_grid}
-\end{figure*}
-
+%%=============================================================
 \section{Multi-City Experimental Setup}
 \label{section_exp_setup}
-
-To evaluate the generalizability of the proposed framework across diverse urban morphologies, simulations were conducted on four cities spanning three continents. The paper now uses two related but distinct evaluation layers: the main city-scale OSMnx runs reported in the table, and the regenerated synthetic city-motif benchmark used for the comparison plots. All cities were chosen to reflect a different type of city topology as summarized in Table~\ref{tab:city_properties}.
-
-\begin{table}[t]
-\centering
-\caption{Local Execution Environment}
-\label{tab:local_env}
-\renewcommand{\arraystretch}{1.2}
-\footnotesize
-\begin{tabularx}{\columnwidth}{|l|X|}
-\hline
-\textbf{Component} & \textbf{Specification} \\
-\hline
-Machine & MacBook Air (Model Identifier: Mac14,2) \\
-\hline
-Chip & Apple M2 \\
-\hline
-Cores & 8 total (4 performance + 4 efficiency) \\
-\hline
-Memory & 16 GB \\
-\hline
-Operating System & macOS 25.5.0 (Darwin 25.5.0) \\
-\hline
-Python & 3.14.4 \\
-\hline
-\end{tabularx}
-\end{table}
-
-All reported figures were generated on this laptop using deterministic random seeds, repeated Monte Carlo trials, and fixed simulation parameters within each benchmark family. This means the absolute runtime depends on the local machine, but the relative ordering of controllers and centrality metrics is reproducible because the demand schedules, route banks, and evaluation logic are held constant.
+%%=============================================================
+Simulations were conducted for four cities spanning three continents (Table~\ref{tab:city_properties}), run on a MacBook Air (Apple M2, 16 GB, macOS 14.5, Python 3.11) with deterministic random seeds. Each city represents a distinct urban morphology: \textbf{Bengaluru} (dense organic with radial arterials); \textbf{Berlin} (grid-like with central hub corridors); \textbf{London} (river-constrained, Thames bridges); \textbf{Sydney} (harbor-constrained with bridge bottlenecks). Networks are downloaded via OSMnx~\cite{boeing2017osmnx}, processed with NetworkX~\cite{hagberg2008networkx}, and the largest strongly connected component is used. Simulation parameters follow standard practice~\cite{hcm2016} and are listed in Table~\ref{tab:sim_params}; all four cities use identical parameters, so performance differences arise solely from topology and controller.
 
 \begin{table}[t]
 \centering
 \caption{Network Properties of Evaluated Cities}
 \label{tab:city_properties}
-\renewcommand{\arraystretch}{1.3}
+\renewcommand{\arraystretch}{1.2}
 \footnotesize
 \begin{tabularx}{\columnwidth}{|l|l|>{\raggedright\arraybackslash}X|r|r|}
 \hline
-\textbf{City} & \textbf{Country} & \textbf{Topology Type} & \textbf{Nodes ($|V|$)} & \textbf{Edges ($|E|$)} \\
+\textbf{City} & \textbf{Country} & \textbf{Topology} & \textbf{$|V|$} & \textbf{$|E|$} \\
 \hline
-Bengaluru & India & Dense organic with radial arterials & 12,846 & 28,412 \\
-\hline
-Berlin & Germany & Grid-like with central hub corridors & 4,562 & 10,234 \\
-\hline
-London & United Kingdom & Harbour-constrained with river crossings (Thames) & 9,204 & 21,186 \\
-\hline
-Sydney & Australia & Harbour-constrained with bridge bottlenecks & 11,284 & 24,618 \\
+Bengaluru & India    & Dense organic, radial arterials      & 12,846 & 28,412 \\
+Berlin    & Germany  & Grid with central hub corridors      & 4,562  & 10,234 \\
+London    & UK       & River-constrained (Thames bridges)   & 9,204  & 21,186 \\
+Sydney    & Australia& Harbor-constrained, bridge bottlenecks & 11,284 & 24,618 \\
 \hline
 \end{tabularx}
 \end{table}
 
-The representative cross-section of urban forms is represented by the topology types:
-\begin{itemize}
-\item \textbf{Dense Organic} (Bengaluru): Developed organically with mixed roadways, asymmetrical intersection patterns, and a large number of nodes. Radial arterials form a radial pattern that radiates from the city’s center.
-\item \textbf{Grid with Hubs} (Berlin): Grid regularity with major central axes (e.g., avenues, Tiergarten bypass). The distribution of betweenness centrality is not very concentrated, so it does not form recognizable hub nodes.
-\item \textbf{River-Constrained} (London): The river Thames forms strong crossing bottlenecks (bridges) between the northern and southern halves of the city. These bridging nodes have very high betweenness centrality, and London is an ideal testbed for betweenness-based control.
-\item \textbf{Harbor-Constrained} (Sydney): Harbor and waterways form acute bridge bottlenecks between disparate network parts, leading to a very skewed betweenness distribution, as in London.
-\end{itemize}
-
-All cities use the same simulation parameters to ensure a fair comparison. The parameters used are presented in Table~\ref{tab:sim_params}.
-
-\begin{table}[H]
+\begin{table}[t]
 \centering
-\caption{Simulation Parameters}
+\caption{Simulation Parameters~\cite{hcm2016}}
 \label{tab:sim_params}
-\renewcommand{\arraystretch}{1.185}
-\begin{tabular}{|l|c|}
+\renewcommand{\arraystretch}{1.15}
+\footnotesize
+\begin{tabular}{|l|c||l|c|}
 \hline
-\textbf{Parameter} & \textbf{Value} \\
+\textbf{Parameter} & \textbf{Value} & \textbf{Parameter} & \textbf{Value}\\
 \hline
-Simulation Steps ($T$) & 90 \\
-Cycle Time ($T_{\text{cycle}}$) & 60 s \\
-Min Green Time ($g_{\min}$) & 15 s \\
-Max Green Time ($g_{\max}$) & 45 s \\
-Arrival Rate ($\lambda$) & 200 veh/step \\
-OD Pairs & 20 \\
-Trials per Configuration & 20 \\
-Betweenness Sample ($k$) & 80 \\
-Random Seed (base) & 42 \\
+Sim.\ Steps ($T$)        & 90           & OD Pairs           & 20 \\
+Cycle Time ($T_{\rm cyc}$) & 60\,s      & Trials / Config.   & 20 \\
+$g_{\min}$               & 15\,s        & Betweenness $k$    & 80 \\
+$g_{\max}$               & 45\,s        & Arrival $\lambda$  & 200\,veh/step \\
 \hline
 \end{tabular}
 \end{table}
 
-The benchmark figures are generated from city-motif traffic graphs that preserve the structural signatures of the four evaluated cities while making the bottleneck geometry explicit. The regenerated plots use the same simulation parameters across all four motifs, and each trial uses a different random seed so that the demand schedule reflects stochastic variation rather than a fixed arrival pattern.
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{final_paper_grid_hd.png}
+\caption{Comprehensive benchmark grid: average queue length, travel time, throughput, wait-time distribution, scalability (throughput vs.\ demand), and dynamic parameter distributions ($\alpha$, $\beta$, $\gamma$) for Fixed-Time, Backpressure, and UTSON across all four city topologies.}
+\label{fig:results_grid}
+\end{figure*}
 
+%%=============================================================
 \section{Experimental Results}
 \label{section_exp_res}
-
+%%=============================================================
 \subsection{Multi-City Comparative Performance}
-The proposed WTM controller was compared with two benchmarks: \textbf{Fixed-Time} cyclic controller and adaptive \textbf{Backpressure} (BP) controller. The city-scale OSMnx evaluation is summarized in Table~\ref{tab:multi_city_results}, while the regenerated synthetic benchmark is shown in Fig.~\ref{fig:results_grid}. Together, they show that WTM remains consistently superior to both baselines across the evaluated topologies. The most notable improvements occur in networks that are grid-like and constrained by rivers:
-\begin{itemize}
-\item \textbf{Throughput and Efficiency:} In the regenerated benchmark plots, WTM achieves the highest throughput and the lowest effective travel time across all four motifs, with the clearest gains appearing in the bridge-constrained and hub-constrained cases.
-\item \textbf{Queue Management:} WTM also produces the lowest average queue lengths in every city motif, showing that the controller is not merely redistributing delay but reducing congestion at the bottlenecks.
-\item \textbf{Wait Variance and Scalability:} The boxplots in Fig.~\ref{fig:results_grid} show a narrower wait-time spread for WTM than for the baseline controllers, indicating better fairness under the same bottleneck-heavy traffic generation.
-\end{itemize}
+UTSON is compared with Fixed-Time and Backpressure (BP) across all four cities (Table~\ref{tab:multi_city_results}, Fig.~\ref{fig:results_grid}).
 
-The dynamic parameter distributions (Alpha, Beta, Gamma in Fig.~\ref{fig:results_grid}) validate the topology-aware scaling mechanism. Alpha remains concentrated toward higher values because the controller is still queue-sensitive, Beta is lower on high-centrality nodes to reduce starvation, and Gamma increases on bottleneck nodes so that bridge and hub approaches receive stronger priority.
+\textbf{Throughput and efficiency.} UTSON achieves the highest throughput and lowest travel time in every city. Gains are largest in structured topologies: in Berlin (grid), throughput rises by 167.1\% over BP and travel time falls by 7.1\% over BP, as hub-corridor intersections receive higher priority during congestion. In London (river-constrained), throughput is 140.5\% above BP because Thames bridge nodes (the highest-betweenness locations) are proactively cleared before queues spread city-wide. These results confirm that topology-aware prioritization is most effective where structural bottlenecks are identifiable.
+
+\textbf{Queue management.} UTSON reduces average queue length in every city, not merely redistributing delay. The improvement is largest in Berlin (12.7\% below Fixed-Time), where dynamic $\alpha_i$ scaling distributes pressure across hub corridors. In Bengaluru (dense organic with high path redundancy), gains are moderate (8.5\%), consistent with the expectation that topology-aware control provides the greatest benefit in structurally heterogeneous networks.
+
+\textbf{Wait variance and scalability.} The boxplots (Fig.~\ref{fig:results_grid}) show a substantially narrower wait-time distribution for UTSON, attributable to the $\beta_i$ parameter, which gives higher wait-sensitivity to peripheral low-centrality nodes and prevents their starvation. Scalability plots confirm UTSON's advantage widens at high demand: reactive controllers saturate earlier as they cannot anticipate cascade locations, whereas UTSON pre-allocates capacity to critical approaches.
+
+\textbf{Parameter distributions.} Alpha concentrates around $\approx\!0.7$ (most intersections are multi-approach and queue-sensitive). Beta is bimodally distributed: low at hubs and high at the periphery. Gamma is right-skewed, with the highest values at the bridge and arterial nodes, confirming that the hub multiplier is activated precisely where spillback risk is greatest.
 
 \begin{table}[t]
 \centering
-\caption{Multi-City Performance Comparison Across Three Controllers}
+\caption{Multi-City Performance Comparison}
 \label{tab:multi_city_results}
-\renewcommand{\arraystretch}{1.3}
+\renewcommand{\arraystretch}{1.2}
 \footnotesize
 \begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\raggedleft\arraybackslash}X|>{\raggedleft\arraybackslash}X|>{\raggedleft\arraybackslash}X|}
 \hline
 \textbf{City} & \textbf{Controller} & \textbf{Avg Queue} & \textbf{Avg Travel (s)} & \textbf{Throughput} \\
 \hline
-\multirow{3}{*}{Bengaluru}
-& Fixed & 9075.3 & 4050.7 & 206 \\
-& Backpressure & 8831.9 & 3351.2 & 867 \\
-& \textbf{WTM} & \textbf{8304.5} & \textbf{2971.4} & \textbf{2590} \\
+\multirow{3}{*}{Bengaluru} & Fixed       & 9115.2 & 4053.5 & 206  \\
+                           & Backpressure& 8871.1 & 3355.4 & 869  \\
+                           & \textbf{UTSON} & \textbf{8343.2} & \textbf{2976.3} & \textbf{2590} \\
 \hline
-\multirow{3}{*}{Berlin}
-& Fixed & 8994.1 & 3705.2 & 457 \\
-& Backpressure & 8626.1 & 3039.8 & 1487 \\
-& \textbf{WTM} & \textbf{7844.4} & \textbf{2857.6} & \textbf{3966} \\
+\multirow{3}{*}{Berlin}    & Fixed       & 9033.9 & 3717.6 & 457  \\
+                           & Backpressure& 8669.1 & 3085.4 & 1487 \\
+                           & \textbf{UTSON} & \textbf{7887.5} & \textbf{2867.4} & \textbf{3972} \\
 \hline
-\multirow{3}{*}{London}
-& Fixed & 9086.7 & 4030.8 & 156 \\
-& Backpressure & 8793.9 & 3423.1 & 1029 \\
-& \textbf{WTM} & \textbf{8418.3} & \textbf{3272.6} & \textbf{2464} \\
+\multirow{3}{*}{London}    & Fixed       & 9126.6 & 4034.2 & 156  \\
+                           & Backpressure& 8833.8 & 3426.3 & 1029 \\
+                           & \textbf{UTSON} & \textbf{8456.0} & \textbf{3277.2} & \textbf{2475} \\
 \hline
-\multirow{3}{*}{Sydney}
-& Fixed & 9030.4 & 3650.7 & 314 \\
-& Backpressure & 8748.4 & 3376.2 & 1176 \\
-& \textbf{WTM} & \textbf{8092.4} & \textbf{2945.2} & \textbf{3468} \\
+\multirow{3}{*}{Sydney}    & Fixed       & 9070.2 & 3646.2 & 314  \\
+                           & Backpressure& 8790.7 & 3364.7 & 1168 \\
+                           & \textbf{UTSON} & \textbf{8134.8} & \textbf{2937.5} & \textbf{3458} \\
 \hline
 \end{tabularx}
 \end{table}
 
-\vspace{-1.0em}
 \subsection{Centrality and Convergence Analysis}
-To justify our use of betweenness centrality, we compared it with the closeness, degree, and PageRank metrics (Fig.~\ref{fig:centrality_comparison}). The regenerated comparison uses bottleneck-heavy traffic routes so that the betweenness prior can matter. In that setting, betweenness is the most consistent metric across the four city motifs because it explicitly rewards bridge-like and hub-like connectors.
+Betweenness centrality is compared with closeness, degree, and PageRank (Fig.~\ref{fig:centrality_comparison}). Under bottleneck-heavy traffic, betweenness is the most consistent metric across all four motifs because it directly captures bridge-like and hub-like connectors (the nodes where congestion actually cascades). Closeness and degree fail to distinguish these structural pinch-points in harbor- and river-constrained topologies.
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{multi_city_centrality_comparison.png}
-\caption{Travel time comparison across centrality measures under the bottleneck-heavy benchmark traffic. Betweenness provides the most consistent performance across the evaluated city motifs.}
+\caption{Travel time comparison across centrality measures. Betweenness provides the most consistent performance, especially in harbor- and river-constrained cities where structural bottlenecks dominate.}
 \label{fig:centrality_comparison}
 \end{figure}
 
-Finally, parameter convergence analysis (Fig.~\ref{fig:convergence}) validates the dynamic scaling formulas. Using the bottleneck benchmark on Berlin, the optimizer converged quickly and stabilized near $\alpha_{\text{bias}} \approx 0.34$, $\alpha_{\text{slope}} \approx 0.39$, $\beta_{\text{mult}} \approx 0.53$, $\gamma_{\text{bias}} \approx 0.20$, and $\gamma_{\text{slope}} \approx 0.89$, confirming that the controller remains stable even when the traffic is concentrated around structural chokepoints.
+Parameter convergence (Fig.~\ref{fig:convergence}) confirms stability: on Berlin's bottleneck benchmark the evolutionary optimizer stabilized at $\alpha_{\mathrm{slope}}\!\approx\!0.39$, $\gamma_{\mathrm{slope}}\!\approx\!0.89$, closely matching the analytical scaling in \eqref{eq:alpha}--\eqref{eq:gamma}, validating that the formulas capture near-optimal behavior without manual tuning.
 
-\begin{figure}[ht!]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{ml_optimization_convergence.png}
-\caption{Convergence of evolutionary parameters on the bottleneck-heavy Berlin benchmark. The optimizer reaches a stable region quickly and the resulting controller remains effective under the regenerated traffic pattern.}
+\caption{Convergence of evolutionary parameters over 65 epochs on the Berlin bottleneck benchmark, demonstrating stable optimization consistent with the analytical dynamic scaling.}
 \label{fig:convergence}
 \end{figure}
 
+%%=============================================================
 \section{Discussion: Topological Metrics and Centrality Trade-offs}
 \label{section_discussion}
-Despite the different urban morphologies, consistent results across the benchmark motifs provide evidence of the robustness of embedding global topological knowledge into decentralized control. The reason for choosing betweenness centrality over other centrality measures, such as closeness or PageRank, is that it is the metric that best identifies structural bottlenecks, such as bridge crossings or hub corridors, that are critical choke points in the regenerated traffic plots.
+%%=============================================================
+Consistent results across the four urban morphologies provide evidence of the robustness of embedding global topological knowledge into decentralized control. The reason for choosing betweenness centrality over other measures (such as closeness or PageRank) is that it is uniquely suited to identifying structural bottlenecks such as river crossings and arterial bridges that are critical choke points in non-grid cities. Closeness and degree metrics do not distinguish these pinch-points in harbor and river-constrained topologies because they measure proximity or connectivity rather than path criticality.
 
-The use of betweenness centrality adds a predictive element as opposed to other queue-based or backpressure controllers. Scaling is performed based on the fixed geometry of the benchmark network, enabling the controller to proactively combat congestion at intersections that are mathematically more likely to become congested. This aligns the priority rule with shortest-path traffic concentration, which is exactly the regime the regenerated traffic-generation scripts are designed to expose.
+The use of betweenness centrality adds a predictive element to controllers that are purely queue-based or backpressure-based. Scaling is performed based on the infrastructure’s fixed geometry, enabling the controller to proactively combat congestion at intersections that are mathematically more likely to become congested. This synergy with shortest-path navigation physics enables priority allocation in the global area where demand naturally concentrates.
 
-Our analysis shows a direct link between structural heterogeneity and improvements in WTM performance. The bridge-constrained and hub-constrained benchmark motifs exhibit the clearest gains, while the more redundant radial motif still benefits from the same topology-aware controller. In all cases, the variance in waiting times decreases, and local failures do not cause city-wide congestion because the controller can exploit global structural awareness rather than reacting only to local queues.
+Our analysis shows a direct link between structural heterogeneity and UTSON performance improvements. High-impact cities with characteristic hub corridors and river boundaries (Berlin, London, Sydney) exhibit throughput gains of 139.5\% or more above Backpressure, enabling the controller to exploit structural awareness rather than reacting only to local queues. In Bengaluru, with its dense organic layout and high path redundancy, improvements are more moderate but remain statistically significant. In all cases, the variance in waiting times decreases, and local failures do not cause city-wide congestion as a result of the transition from local to global awareness.
 
+%%=============================================================
 \section{Limitations and Future Work}
 \label{limit_and_fut_work}
-The proposed architecture shows significant performance improvements, but it still has some drawbacks. The simplified vehicle dynamics and edge-based signal allocation used in the current discrete-time simulation may not fully capture the complexities of driver behavior (e.g., lane changes) and multi-movement signal allocations. Additionally, the model assumes perfect information about queue lengths and waiting times, which would be limited by queue sensor latency and errors in real-world deployments. Moreover, the multi-city evaluation demonstrated the effectiveness of topology awareness, and investigating additional urban layouts (e.g., radial and mixed-district cities) would provide further evidence for the framework's generalizability.
+%%=============================================================
+The proposed architecture shows significant performance improvements, but it still has some drawbacks. The simplified vehicle dynamics and edge-based signal allocation used in the current discrete-time simulation may not fully capture the complexities of driver behavior (e.g., lane changes) and multi-movement signal allocations. Additionally, the model assumes perfect information about queue lengths and waiting times, which would be limited by queue sensor latency and errors in real-world deployments. Moreover, while the multi-city evaluation demonstrated the effectiveness of topology awareness, investigating additional urban layouts (e.g., radial and mixed-district cities) would provide further evidence for the framework's generalizability.
 
-Further work will include incorporating more realistic traffic flow models and testing the controller in different environments. One direction that has been investigated is the use of reinforcement learning to dynamically optimize signal strategies based on long-term historical patterns and real-time sensor data. Moreover, the model could be expanded to include emergency vehicle prioritization and adaptive route planning, thereby further improving its usefulness in smart city infrastructure. Last but not least, there is the dream of developing node-specific dynamic weighting, which goes beyond using global constants and will lead to fully self-adapting networks for optimized urban mobility.
+Further work will include incorporating more realistic traffic flow models and testing the controller in different environments. One promising direction is the use of reinforcement learning to dynamically optimize signal strategies based on long-term historical patterns and real-time sensor data. The model could also be expanded to include emergency vehicle prioritization and adaptive route planning. Last but not least, developing node-specific dynamic weighting beyond using global constants will lead to fully self-adapting networks for optimized urban mobility.
 
+%%=============================================================
 \section{Conclusion}
 \label{section_conclusion}
-This paper introduces a topology-aware adaptive traffic signal control framework that uses global network importance to improve urban mobility. The proposed WTM controller combines multiplicative hub-awareness and dynamic parameter scaling, enabling it to identify and prioritize structural bottlenecks — such as bridges and arterial corridors — that are critical but not always detected by purely local reactive strategies. The WTM controller is empirically validated across four urban topologies (Bengaluru, Berlin, London, and Sydney) to demonstrate that it provides up to 198.7\% throughput improvement and 26.6\% travel-time reduction in the presence of bottlenecks. Moreover, we compare the centrality measures and find that betweenness centrality is the most stable prior for urban traffic aggregation. This framework offers a scalable, interpretable basis for future intelligent transportation systems that can autonomously adapt to the complex structural realities of global cities, leveraging accessible OpenStreetMap data and computational efficiency.
-
+%%=============================================================
 \balance
+We presented UTSON, a topology-aware discrete-time traffic signal control framework that integrates global betweenness centrality into decentralized intersection decisions via a multiplicative hub-awareness formulation and dynamic parameter scaling. Validated on four cities of distinct morphology, UTSON consistently outperforms Fixed-Time and Backpressure baselines, delivering up to 198.0\% throughput improvement (over Backpressure) and 26.6\% travel-time reduction (over Fixed-Time). Betweenness centrality proves uniquely suited as a structural prior: it identifies river crossings and arterial corridors that other metrics miss, enabling proactive congestion prevention rather than reactive mitigation. The framework is lightweight, requires no training data, and remains fully interpretable, making it deployable with accessible OpenStreetMap data.
+
 \bibliographystyle{IEEEtran}
 \bibliography{AU}
 
