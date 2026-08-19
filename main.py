@@ -515,7 +515,7 @@ if __name__ == "__main__":
         pd.DataFrame(
             [
                 {
-                    "Controller": "PROPOSED (Live-Dynamic WTM)"
+                    "Controller": "UrbSigOpt (Live-Dynamic WTM)"
                     if r["controller"] == "dynamic_wtm"
                     else r["controller"].upper(),
                     "Avg Queue": round(r["avg_queue_length"], 2),
@@ -533,7 +533,7 @@ if __name__ == "__main__":
     )
 
     print("\n" + "=" * 100)
-    print("WAITING TIME COMPARISON: Fixed vs Backpressure vs Proposed (Live-Dynamic WTM)")
+    print("WAITING TIME COMPARISON: Fixed vs Backpressure vs UrbSigOpt (Live-Dynamic WTM)")
     print("=" * 100)
     print(wtm_comparison_df.to_string(index=False))
     print("=" * 100)
@@ -548,7 +548,7 @@ if __name__ == "__main__":
     controller_labels = {
         "fixed": "Fixed (Baseline)",
         "backpressure": "Backpressure",
-        "dynamic_wtm": "Proposed (Live-Dynamic WTM)",
+        "dynamic_wtm": "UrbSigOpt (Live-Dynamic WTM)",
     }
     controller_colors = {
         "fixed": "#95a5a6",  # Light Grey
@@ -601,7 +601,7 @@ if __name__ == "__main__":
     plt.rcParams["hatch.linewidth"] = 3.0
     bar_width = 0.55
     labels = [controller_labels[c] for c in controllers_list]
-    labels_short = ["Fixed", "BP", "Proposed"]
+    labels_short = ["Fixed", "BP", "UrbSigOpt"]
     colors = [controller_colors[c] for c in controllers_list]
     hatches = [controller_hatches[c] for c in controllers_list]
 
@@ -819,7 +819,7 @@ if __name__ == "__main__":
         f.write("WAITING TIME COMPARISON:\n")
         f.write(wtm_comparison_df.to_string(index=False))
         f.write("\n" + "=" * 60 + "\n")
-        f.write("\nNOTE: The 'Proposed (Dynamic WTM)' controller now uses Live-Dynamic\n")
+        f.write("\nNOTE: The 'UrbSigOpt (Dynamic WTM)' controller now uses Live-Dynamic\n")
         f.write("green light timing allocation, where each intersection adjusts its\n")
         f.write("green duration in real-time based on:\n")
         f.write("  - Alpha (α): Current queue pressure relative to capacity\n")

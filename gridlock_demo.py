@@ -114,7 +114,7 @@ fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
 colors = {"fixed": "#e74c3c", "backpressure": "#3498db", "dynamic_wtm": "#27ae60"}
 linestyles = {"fixed": ":", "backpressure": "--", "dynamic_wtm": "-"}
 markers = {"fixed": "s", "backpressure": "^", "dynamic_wtm": "o"}
-labels = {"fixed": "Fixed-Time", "backpressure": "Backpressure", "dynamic_wtm": "Proposed WTM"}
+labels = {"fixed": "Fixed-Time", "backpressure": "Backpressure", "dynamic_wtm": "UrbSigOpt"}
 
 for ctrl in ["fixed", "backpressure", "dynamic_wtm"]:
     history = results[ctrl]["queue_history"]

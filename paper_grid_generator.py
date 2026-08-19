@@ -95,7 +95,7 @@ def run_full_analysis(city_name, city_label):
     })
     colors = {"fixed": "#ffcccc", "backpressure": "#cce5ff", "dynamic_wtm": "#ccffcc"}
     hatches = ["/", "\\", "x"]
-    labels_short = ["Fixed", "BP", "Proposed"]
+    labels_short = ["Fixed", "BP", "UrbSigOpt"]
     
     # Rows 1-3: Bars
     metrics = [
