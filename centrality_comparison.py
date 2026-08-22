@@ -316,12 +316,15 @@ def run_multi_city_comparison():
             "xtick.major.pad": 8,
             "ytick.major.pad": 8,
             "legend.frameon": True,
+            "hatch.linewidth": 2.0,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "svg.fonttype": "none",
         }
     )
     fig, ax = plt.subplots(figsize=(14, 8), constrained_layout=True)
-    palette = ["#ccffcc", "#cce5ff", "#ffe5cc", "#e5ccff"]
-    hatches = ["/", "\\", "x", "."]
-    plt.rcParams["hatch.linewidth"] = 2.2
+    palette = ["#baffc9", "#bae1ff", "#ffd8a8", "#d0bfff"]
+    hatches = ["///", "\\\\\\", "xxx", "..."]
     pivot_df.plot(
         kind="bar",
         ax=ax,
@@ -374,7 +377,17 @@ def run_multi_city_comparison():
         bbox_inches="tight",
         pad_inches=0.25,
     )
-    print("Success: multi_city_centrality_comparison.png")
+    fig.savefig(
+        "multi_city_centrality_comparison.svg",
+        bbox_inches="tight",
+        pad_inches=0.25,
+    )
+    fig.savefig(
+        "multi_city_centrality_comparison.pdf",
+        bbox_inches="tight",
+        pad_inches=0.25,
+    )
+    print("Success: Generated multi_city_centrality_comparison.svg, .pdf, and .png")
 
 
 if __name__ == "__main__":

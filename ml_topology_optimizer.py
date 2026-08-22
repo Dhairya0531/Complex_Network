@@ -152,11 +152,17 @@ def generate_paper_convergence_plot():
     ax2.grid(True, linestyle='--', alpha=0.3)
     ax2.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), frameon=True, fontsize=7.5, borderpad=0.4, labelspacing=0.4)
 
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'svg.fonttype': 'none',
+    })
+
     # Plot 3: 100-Trial Comparison Bar Plot
     controllers = ["fixed", "backpressure", "dynamic_wtm"]
     labels_short = ["Fixed", "BP", "UrbSigOpt"]
-    colors_bars = {"fixed": "#ffcccc", "backpressure": "#cce5ff", "dynamic_wtm": "#ccffcc"}
-    hatches = ["/", "\\", "x"]
+    colors_bars = {"fixed": "#ffb3ba", "backpressure": "#bae1ff", "dynamic_wtm": "#baffc9"}
+    hatches = ["///", "\\\\\\", "xxx"]
     
     means = [2028.1, 1145.8, 929.5]
     stds = [45.2, 58.6, 115.4]
@@ -167,8 +173,8 @@ def generate_paper_convergence_plot():
         yerr=stds,
         color=[colors_bars[c] for c in controllers],
         edgecolor="black",
-        linewidth=1.2,
-        error_kw=dict(ecolor="black", elinewidth=1.2, capsize=4, capthick=1.0),
+        linewidth=1.4,
+        error_kw=dict(ecolor="black", elinewidth=1.4, capsize=5, capthick=1.4),
         width=0.55
     )
     for b, h in zip(bars, hatches):
@@ -194,15 +200,16 @@ def generate_paper_convergence_plot():
         
     import matplotlib.patches as mpatches
     legend_patches = [
-        mpatches.Patch(facecolor="#ffcccc", edgecolor="black", hatch="/", label="Fixed (Baseline)"),
-        mpatches.Patch(facecolor="#cce5ff", edgecolor="black", hatch="\\", label="Backpressure"),
-        mpatches.Patch(facecolor="#ccffcc", edgecolor="black", hatch="x", label="UrbSigOpt")
+        mpatches.Patch(facecolor="#ffb3ba", edgecolor="black", hatch="///", label="Fixed (Baseline)"),
+        mpatches.Patch(facecolor="#bae1ff", edgecolor="black", hatch="\\\\\\", label="Backpressure"),
+        mpatches.Patch(facecolor="#baffc9", edgecolor="black", hatch="xxx", label="UrbSigOpt")
     ]
     ax3.legend(handles=legend_patches, loc="upper right", frameon=True, framealpha=0.95, fontsize=7.2, borderpad=0.3)
 
-    output_path = "ml_optimization_convergence.png"
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    print(f"\nSuccess: Paper-ready plot saved as '{output_path}'")
+    plt.savefig("ml_optimization_convergence.png", dpi=300, bbox_inches='tight')
+    plt.savefig("ml_optimization_convergence.svg", bbox_inches='tight')
+    plt.savefig("ml_optimization_convergence.pdf", bbox_inches='tight')
+    print("\nSuccess: Paper-ready plots saved as 'ml_optimization_convergence.svg', '.pdf', and '.png'")
 
 if __name__ == "__main__":
     generate_paper_convergence_plot()
