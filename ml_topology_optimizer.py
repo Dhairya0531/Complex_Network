@@ -1,8 +1,13 @@
 import os
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import networkx as nx
+
+# Ensure fonts are embedded as TrueType (Type 42) for LaTeX and PDF compatibility
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 
 from main import (
     prepare_topology,
@@ -206,10 +211,14 @@ def generate_paper_convergence_plot():
     ]
     ax3.legend(handles=legend_patches, loc="upper right", frameon=True, framealpha=0.95, fontsize=7.2, borderpad=0.3)
 
+    os.makedirs("plots", exist_ok=True)
     plt.savefig("ml_optimization_convergence.png", dpi=300, bbox_inches='tight')
-    plt.savefig("ml_optimization_convergence.svg", bbox_inches='tight')
-    plt.savefig("ml_optimization_convergence.pdf", bbox_inches='tight')
-    print("\nSuccess: Paper-ready plots saved as 'ml_optimization_convergence.svg', '.pdf', and '.png'")
+    plt.savefig("plots/ml_optimization_convergence.png", dpi=300, bbox_inches='tight')
+    plt.savefig("ml_optimization_convergence.svg", format='svg', bbox_inches='tight')
+    plt.savefig("plots/ml_optimization_convergence.svg", format='svg', bbox_inches='tight')
+    plt.savefig("ml_optimization_convergence.pdf", format='pdf', bbox_inches='tight')
+    plt.savefig("plots/ml_optimization_convergence.pdf", format='pdf', bbox_inches='tight')
+    print("\nSuccess: Paper-ready plots saved as 'ml_optimization_convergence.svg', '.pdf', and '.png' in root and plots/")
 
 if __name__ == "__main__":
     generate_paper_convergence_plot()

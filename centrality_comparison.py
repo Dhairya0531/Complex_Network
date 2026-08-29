@@ -1,7 +1,13 @@
+import os
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
+
+# Ensure fonts are embedded as TrueType (Type 42) for LaTeX and PDF compatibility
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 
 from main import prepare_topology, run_simulation_with_waiting_time
 
@@ -371,8 +377,15 @@ def run_multi_city_comparison():
         borderaxespad=0.0,
         framealpha=0.95,
     )
+    os.makedirs("plots", exist_ok=True)
     fig.savefig(
         "multi_city_centrality_comparison.png",
+        dpi=300,
+        bbox_inches="tight",
+        pad_inches=0.25,
+    )
+    fig.savefig(
+        "plots/multi_city_centrality_comparison.png",
         dpi=300,
         bbox_inches="tight",
         pad_inches=0.25,
@@ -383,11 +396,23 @@ def run_multi_city_comparison():
         pad_inches=0.25,
     )
     fig.savefig(
-        "multi_city_centrality_comparison.pdf",
+        "plots/multi_city_centrality_comparison.svg",
         bbox_inches="tight",
         pad_inches=0.25,
     )
-    print("Success: Generated multi_city_centrality_comparison.svg, .pdf, and .png")
+    fig.savefig(
+        "multi_city_centrality_comparison.pdf",
+        format="pdf",
+        bbox_inches="tight",
+        pad_inches=0.25,
+    )
+    fig.savefig(
+        "plots/multi_city_centrality_comparison.pdf",
+        format="pdf",
+        bbox_inches="tight",
+        pad_inches=0.25,
+    )
+    print("Success: Generated multi_city_centrality_comparison.svg, .pdf, and .png in root and plots/")
 
 
 if __name__ == "__main__":

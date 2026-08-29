@@ -1,8 +1,15 @@
 import os
 import numpy as np
+import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
 import networkx as nx
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+
+# Ensure fonts are embedded as TrueType (Type 42) for LaTeX and PDF compatibility
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 from main import (
     prepare_topology, 
     run_simulation_with_waiting_time, 
@@ -17,7 +24,8 @@ from centrality_comparison import (
     get_graph_local,
 )
 
-# --- CONFIGURATION ---
+# --- LOAD CONFIGURATION & OSM EXTRACTION SPECS ---
+EXCEL_PATH = "city_osm_extraction_areas.xlsx"
 CITIES = [
     ("Cubbon Park, Bengaluru, India", "Bengaluru"),
     ("Brandenburg Gate, Berlin, Germany", "Berlin"),
@@ -29,6 +37,21 @@ SIM_STEPS = BENCHMARK_SIM_STEPS
 NUM_TRIALS = 20
 DEMAND_LEVELS = {"Low": 10, "Med": 16, "High": 24}
 ARRIVAL_RATE = BENCHMARK_ARRIVAL_RATE
+
+if os.path.exists(EXCEL_PATH):
+    try:
+        df_cities = pd.read_excel(EXCEL_PATH, sheet_name="City Extraction Areas", header=2)
+        df_params = pd.read_excel(EXCEL_PATH, sheet_name="Simulation Parameters", header=2)
+        param_dict = dict(zip(df_params["Parameter Name"], df_params["Value"]))
+        if "Simulation Steps (T)" in param_dict:
+            SIM_STEPS = int(param_dict["Simulation Steps (T)"])
+        if "Evaluation Trials" in param_dict:
+            NUM_TRIALS = int(param_dict["Evaluation Trials"])
+        print(f"Loaded parameters from {EXCEL_PATH}: Steps={SIM_STEPS}, Trials={NUM_TRIALS}")
+    except Exception as e:
+        print(f"Using default parameters, error reading {EXCEL_PATH}: {e}")
+
+os.makedirs("plots", exist_ok=True)
 
 
 def get_city_graph(place, city_label):
@@ -89,12 +112,12 @@ def run_full_analysis(city_name, city_label):
         'xtick.labelsize': 21,
         'ytick.labelsize': 21,
         'legend.fontsize': 19,
-        'axes.linewidth': 2.2,
+        'axes.linewidth': 2.0,
         'axes.labelpad': 10,
         'xtick.major.pad': 8,
         'ytick.major.pad': 8,
         'legend.frameon': True,
-        'hatch.linewidth': 2.0,
+        'hatch.linewidth': 0.9,
         'hatch.color': 'black',
         'pdf.fonttype': 42,
         'ps.fonttype': 42,
@@ -102,17 +125,20 @@ def run_full_analysis(city_name, city_label):
     })
     
     # --- VIBRANT & PRINT-OPTIMIZED COLOR PALETTE ---
-    # Rich, vibrant modern hues on display + distinct patterns & luminance for greyscale A4 printing
     bar_colors = {"fixed": "#ffb3ba", "backpressure": "#bae1ff", "dynamic_wtm": "#baffc9"}
     line_colors = {"fixed": "#e63946", "backpressure": "#1d3557", "dynamic_wtm": "#2a9d8f"}
     marker_face_colors = {"fixed": "#e63946", "backpressure": "#457b9d", "dynamic_wtm": "#2a9d8f"}
-    hatches = ["///", "\\\\\\", "xxx"]
+    hatches = ["/", "\\", "x"]
     labels_short = ["Fixed", "BP", "UrbSigOpt"]
     
     def save_multiformat(fig, prefix):
         fig.savefig(f"{prefix}.png", dpi=300, bbox_inches='tight', pad_inches=0.18)
-        fig.savefig(f"{prefix}.pdf", bbox_inches='tight', pad_inches=0.18)
-        fig.savefig(f"{prefix}.svg", bbox_inches='tight', pad_inches=0.18)
+        fig.savefig(f"{prefix}.pdf", format='pdf', bbox_inches='tight', pad_inches=0.18)
+        fig.savefig(f"{prefix}.svg", format='svg', bbox_inches='tight', pad_inches=0.18)
+        # Also copy to plots/ directory
+        base_name = os.path.basename(prefix)
+        city_name = os.path.dirname(prefix)
+        fig.savefig(f"plots/{city_name}_{base_name}.pdf", format='pdf', bbox_inches='tight', pad_inches=0.18)
 
     # Rows 1-3: Bars with Error Bars (Quantifying trial randomization)
     metrics = [
@@ -264,12 +290,12 @@ def run_full_analysis(city_name, city_label):
 def create_unified_vector_and_hd_grid(city_datasets):
     """
     Generates a single unified figure containing the 8x4 grid,
-    exporting vector PDF, vector SVG, and high-res 300 DPI PNG.
+    exporting vector PDF (with Type 42 fonts), vector SVG, and high-res 300 DPI PNG.
     """
     city_labels = ["Bengaluru", "Berlin", "London", "Sydney"]
     controllers = ["fixed", "backpressure", "dynamic_wtm"]
     labels_short = ["Fixed", "BP", "UrbSigOpt"]
-    hatches = ["///", "\\\\\\", "xxx"]
+    hatches = ["/", "\\", "x"]
     bar_colors = {"fixed": "#ffb3ba", "backpressure": "#bae1ff", "dynamic_wtm": "#baffc9"}
     line_colors = {"fixed": "#e63946", "backpressure": "#1d3557", "dynamic_wtm": "#2a9d8f"}
     marker_face_colors = {"fixed": "#e63946", "backpressure": "#457b9d", "dynamic_wtm": "#2a9d8f"}
@@ -287,7 +313,7 @@ def create_unified_vector_and_hd_grid(city_datasets):
         'xtick.major.pad': 6,
         'ytick.major.pad': 6,
         'legend.frameon': True,
-        'hatch.linewidth': 1.8,
+        'hatch.linewidth': 0.8,
         'hatch.color': 'black',
         'pdf.fonttype': 42,
         'ps.fonttype': 42,
@@ -441,7 +467,7 @@ def create_unified_vector_and_hd_grid(city_datasets):
             flierprops=dict(marker='o', markersize=5, markerfacecolor='#555555', markeredgecolor='black', markeredgewidth=1.0, alpha=0.85)
         )
         param_colors = ["#f4a261", "#e9c46a", "#e76f51"]
-        param_hatches = ["///", "\\\\\\", "xxx"]
+        param_hatches = ["/", "\\", "x"]
         for j, patch in enumerate(bp_p['boxes']):
             patch.set(facecolor=param_colors[j], edgecolor='black', linewidth=1.8)
             patch.set_hatch(param_hatches[j])
@@ -450,14 +476,21 @@ def create_unified_vector_and_hd_grid(city_datasets):
         ax_p.tick_params(axis='y', labelsize=17)
         ax_p.grid(axis='y', linestyle='--', alpha=0.45, color='#c0c0c0', linewidth=1.0)
 
-    print("Saving final_paper_grid.pdf (LaTeX vector)...")
-    fig.savefig("final_paper_grid.pdf", bbox_inches='tight', pad_inches=0.1)
-    print("Saving final_paper_grid.svg (Vector)...")
-    fig.savefig("final_paper_grid.svg", bbox_inches='tight', pad_inches=0.1)
-    print("Saving final_paper_grid_hd.png (High-Res Raster)...")
-    fig.savefig("final_paper_grid_hd.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
+    os.makedirs("plots", exist_ok=True)
+    print("Saving plots/final_paper_grid.pdf (LaTeX vector)...")
+    plt.savefig('plots/final_paper_grid.pdf', format='pdf', bbox_inches='tight')
+    plt.savefig('final_paper_grid.pdf', format='pdf', bbox_inches='tight')
+    
+    print("Saving plots/final_paper_grid.svg (Vector)...")
+    plt.savefig('plots/final_paper_grid.svg', format='svg', bbox_inches='tight')
+    plt.savefig('final_paper_grid.svg', format='svg', bbox_inches='tight')
+    
+    print("Saving plots/final_paper_grid_hd.png (High-Res Raster)...")
+    plt.savefig('plots/final_paper_grid_hd.png', format='png', dpi=300, bbox_inches='tight')
+    plt.savefig('final_paper_grid_hd.png', format='png', dpi=300, bbox_inches='tight')
+    
     plt.close(fig)
-    print("Success: Generated PDF, SVG, and HD PNG for full grid.")
+    print("Success: Generated Type 42 TrueType PDF, SVG, and HD PNG for full grid.")
 
 
 if __name__ == "__main__":
